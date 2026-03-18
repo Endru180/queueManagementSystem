@@ -9,7 +9,6 @@
 	let userLng = null;
 	let loading = false;
 
-	// Haversine formula - hitung jarak antara dua koordinat
 	function getDistance(lat1, lng1, lat2, lng2) {
 		const R = 6371; // radius bumi dalam km
 		const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -27,7 +26,6 @@
 		if (!category) return;
 		loading = true;
 
-		// Cek cache dulu
 		const cacheKey = `locations_${category}`;
 		const cached = localStorage.getItem(cacheKey);
 		const cacheTime = localStorage.getItem(`${cacheKey}_time`);
@@ -46,7 +44,6 @@
 			localStorage.setItem(`${cacheKey}_time`, Date.now());
 		}
 
-		// Hitung jarak kalau ada koordinat user
 		if (userLat && userLng) {
 			locations = data
 				.map((loc) => ({
@@ -69,7 +66,6 @@
 			userLng = parseFloat(lng);
 		}
 
-		// Tambahkan ini
 		category = $page.url.searchParams.get('category') || '';
 		if (category) fetchLocations();
 	});
