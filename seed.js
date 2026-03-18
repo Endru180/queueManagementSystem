@@ -24,7 +24,7 @@ const cities = [
 ];
 
 // Data kecamatan
-const districts = [
+const subdistricts = [
     // Jakarta Pusat
     { id: '317101', city_id: '3171', name: 'Gambir', latitude: -6.1718, longitude: 106.8243 },
     { id: '317102', city_id: '3171', name: 'Sawah Besar', latitude: -6.1575, longitude: 106.8372 },
@@ -74,9 +74,9 @@ async function seed() {
     const { error: e2 } = await supabase.from('cities').upsert(cities);
     if (e2) console.error('cities error:', e2.message);
 
-    console.log('Seeding districts...');
-    const { error: e3 } = await supabase.from('districts').upsert(districts);
-    if (e3) console.error('districts error:', e3.message);
+    console.log('Seeding subdistricts...');
+    const { error: e3 } = await supabase.from('subdistricts').upsert(subdistricts);
+    if (e3) console.error('subdistricts error:', e3.message);
 
     console.log('Seeding service locations...');
     const { error: e4 } = await supabase.from('service_locations').upsert(serviceLocations);

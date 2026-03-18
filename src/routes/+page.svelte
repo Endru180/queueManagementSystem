@@ -4,7 +4,7 @@
 
 	let provinces = [];
 	let cities = [];
-	let districts = [];
+	let subdistricts = [];
 
 	async function loadProvinces() {
 		const { data } = await supabase.from('provinces').select('*').order('name');
@@ -18,16 +18,16 @@
 			.eq('province_id', provinceId)
 			.order('name');
 		cities = data || [];
-		districts = [];
+		subdistricts = [];
 	}
 
-	async function loadDistricts(cityId) {
+	async function loadsubdistricts(cityId) {
 		const { data } = await supabase
-			.from('districts')
+			.from('subdistricts')
 			.select('*')
 			.eq('city_id', cityId)
 			.order('name');
-		districts = data || [];
+		subdistricts = data || [];
 	}
 
 	let showGpsPrompt = false;
@@ -37,7 +37,7 @@
 	onMount(async () => {
 		const gpsDone = localStorage.getItem('gpsDone');
 		if (!gpsDone) {
-			showGpsPrompt = true; // hanya tampil kalau belum pernah jawab
+			showGpsPrompt = true; 
 		} else if (gpsDone === 'denied') {
 			gpsDenied = true;
 		}
@@ -93,15 +93,15 @@
 		manualLocation.city = opt.value;
 		manualLocation.cityName = opt.text;
 		locationConfirmed = false;
-		loadDistricts(opt.value);
+		loadsubdistricts(opt.value);
 		checkAndShowToast();
 	}
 
-	function onDistrictSelect(e) {
+	function onsubdistrictselect(e) {
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.district = opt.value;
 		manualLocation.districtName = opt.text;
-		const selected = districts.find((d) => String(d.id) === String(opt.value));
+		const selected = subdistricts.find((d) => String(d.id) === String(opt.value));
 		console.log('Selected district:', selected);
 		if (selected) {
 			localStorage.setItem('userLat', selected.latitude);
@@ -202,9 +202,9 @@
 				{/each}
 			</select>
 
-			<select onchange={onDistrictSelect}>
+			<select onchange={onsubdistrictselect}>
 				<option value="" disabled selected>Select Subdistrict</option>
-				{#each districts as d (d.id)}
+				{#each subdistricts as d (d.id)}
 					<option value={d.id}>{d.name}</option>
 				{/each}
 			</select>
