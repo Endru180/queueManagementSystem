@@ -102,6 +102,12 @@
 			</div>
 		{/if}
 
+		{#if myQueue?.service_types?.delay_minutes > 0}
+    		<div class="delay-alert">
+				Mohon maaf, petugas sedang menangani kasus yang membutuhkan waktu lebih lama.
+    		</div>
+		{/if}
+
 		{#if isNearby}
 			<div class="warning">
 				<strong>WARNING</strong>: Stay Alert over the current number
@@ -169,6 +175,15 @@
 		border-radius: 8px;
 		padding: 0.8rem 1rem;
 		text-align: center;
+	}
+
+	.delay-alert {
+    	background: #ff9800;
+    	color: white;
+    	border-radius: 8px;
+    	padding: 0.8rem 1rem;
+    	text-align: center;
+    	font-size: 0.9rem;
 	}
 
 	.actions {
