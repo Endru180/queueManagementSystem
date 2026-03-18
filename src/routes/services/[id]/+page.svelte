@@ -32,7 +32,6 @@
 	async function takeQueue() {
 		error = '';
 
-		// Validasi input
 		if (!nik || nik.length !== 16 || !/^\d+$/.test(nik)) {
 			error = 'NIK must be 16 digits.';
 			return;
@@ -51,14 +50,12 @@
 
 		submitting = true;
 
-		// Hash NIK pakai SHA-256
 		const encoder = new TextEncoder();
 		const data = encoder.encode(nik);
 		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 		const hashArray = Array.from(new Uint8Array(hashBuffer));
 		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
-		// Ambil queue number terakhir untuk service type ini
 		const { data: lastQueue } = await supabase
 			.from('queues')
 			.select('queue_number, service_types!inner(service_location_id)')
@@ -70,7 +67,6 @@
 
 		const queueNumber = lastQueue ? lastQueue.queue_number + 1 : 1;
 
-		// Insert queue baru
 		const { data: newQueue, error: insertError } = await supabase
 			.from('queues')
 			.insert({
@@ -88,7 +84,6 @@
 			return;
 		}
 
-		// Simpan queue id ke localStorage lalu redirect ke monitor
 		const existingIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
 		existingIds.push(newQueue.id);
 		localStorage.setItem('myQueueIds', JSON.stringify(existingIds));
