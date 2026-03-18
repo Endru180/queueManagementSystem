@@ -9,7 +9,6 @@
 	let subscription = null;
 
 	async function fetchQueueData(queueId) {
-		// Ambil data antrian user
 		const { data: myData } = await supabase
 			.from('queues')
 			.select('*, service_types(*)')
@@ -19,7 +18,6 @@
 		myQueue = myData;
 
 		if (myQueue) {
-			// Ambil nomor yang sedang dilayani (status = 'serving')
 			const { data: serving } = await supabase
 				.from('queues')
 				.select('queue_number')
@@ -62,7 +60,8 @@
 
 	$: estimasi = myQueue
 		? Math.max(0, myQueue.queue_number - (currentNumber ?? 0)) *
-			(myQueue.service_types?.avg_duration ?? 10)
+			(myQueue.service_types?.avg_duration ?? 10) +
+			(myQueue.service_types?.delay_minutes ?? 0)
 		: null;
 
 	$: isNearby = myQueue && myQueue.queue_number - (currentNumber ?? 0) <= 3;
