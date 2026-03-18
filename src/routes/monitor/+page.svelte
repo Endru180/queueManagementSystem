@@ -104,7 +104,7 @@
 
 		{#if myQueue?.service_types?.delay_minutes > 0}
     		<div class="delay-alert">
-				Mohon maaf, petugas sedang menangani kasus yang membutuhkan waktu lebih lama.
+				Sorry, the officer is handling a case that requires more time.
     		</div>
 		{/if}
 
