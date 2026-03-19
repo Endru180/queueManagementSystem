@@ -21,7 +21,7 @@
 		subdistricts = [];
 	}
 
-	async function loadsubdistricts(cityId) {
+	async function loadSubdistricts(cityId) {
 		const { data } = await supabase
 			.from('subdistricts')
 			.select('*')
@@ -93,20 +93,18 @@
 		manualLocation.city = opt.value;
 		manualLocation.cityName = opt.text;
 		locationConfirmed = false;
-		loadsubdistricts(opt.value);
+		loadSubdistricts(opt.value);
 		checkAndShowToast();
 	}
 
-	function onsubdistrictselect(e) {
+	function onSubdistrictSelect(e) {
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.district = opt.value;
 		manualLocation.districtName = opt.text;
 		const selected = subdistricts.find((d) => String(d.id) === String(opt.value));
-		console.log('Selected district:', selected);
 		if (selected) {
 			localStorage.setItem('userLat', selected.latitude);
 			localStorage.setItem('userLng', selected.longitude);
-			console.log('Saved coords:', selected.latitude, selected.longitude);
 		}
 		locationConfirmed = false;
 		checkAndShowToast();
@@ -202,7 +200,7 @@
 				{/each}
 			</select>
 
-			<select onchange={onsubdistrictselect}>
+			<select onchange={onSubdistrictSelect}>
 				<option value="" disabled selected>Select Subdistrict</option>
 				{#each subdistricts as d (d.id)}
 					<option value={d.id}>{d.name}</option>
