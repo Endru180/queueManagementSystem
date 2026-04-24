@@ -36,8 +36,8 @@
 			error = 'NIK must be 16 digits.';
 			return;
 		}
-		if (!waNumber || !/^\d+$/.test(waNumber)) {
-			error = 'WhatsApp number must be digits only.';
+		if (!waNumber || !/^(08|628)\d{8,11}$/.test(waNumber)) {
+			error = 'WhatsApp number must start with 08 or 628 and be 10-13 digits.';
 			return;
 		}
 		if (!selectedServiceType) {
@@ -56,16 +56,25 @@
 		const hashArray = Array.from(new Uint8Array(hashBuffer));
 		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
-		const { data: lastQueue } = await supabase
+		// Cek apakah NIK sudah ada di antrian hari ini
+		const { data: existing } = await supabase
 			.from('queues')
-			.select('queue_number, service_types!inner(service_location_id)')
-			.eq('service_types.service_location_id', location.id)
-			.in('status', ['waiting', 'serving'])
-			.order('queue_number', { ascending: false })
-			.limit(1)
+			.select('id')
+			.eq('nik_hash', nikHash)
+			.eq('status', 'waiting')
 			.single();
 
-		const queueNumber = lastQueue ? lastQueue.queue_number + 1 : 1;
+		if (existing) {
+			error = 'You already have an active queue!';
+			submitting = false;
+			return;
+		}
+
+		const { data: queueData } = await supabase.rpc('get_next_queue_number', {
+			loc_id: location.id
+		});
+
+		const queueNumber = queueData;
 
 		const { data: newQueue, error: insertError } = await supabase
 			.from('queues')
