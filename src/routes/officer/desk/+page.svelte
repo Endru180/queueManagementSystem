@@ -136,10 +136,16 @@
 		showCloseConfirm = false;
 	}
 
+	function reopenRegistration() {
+		registrationOpen = true;
+	}
+
 	function logout() {
 		localStorage.removeItem('officerSession');
 		window.location.href = '/officer/login';
 	}
+
+	
 </script>
 
 
@@ -254,6 +260,10 @@
 				<div class="closed-card">
 					<h2>CLOSED</h2>
 					<p>You have closed the registration.</p>
+
+					<button class = "reopen-btn" on:click={reopenRegistration}>
+						Reopen Registration
+					</button>
 				</div>
 			</section>
 		{/if}
@@ -448,5 +458,10 @@
 		.close-box {
 			justify-content: stretch;
 		}
+	}
+
+	.reopen-btn {
+	margin-top: 1rem;
+	width: 100%;
 	}
 </style>
