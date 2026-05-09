@@ -1,35 +1,42 @@
 <script>
 	import { supabase } from '$lib/supabase.js';
 
-	let officerId = '';
+	let email = '';
 	let password = '';
 	let error = '';
 
 	async function login() {
 		error = '';
 
-		if (!officerId || !password) {
+		if (!email || !password) {
 			error = 'Officer ID dan password harus diisi.';
 			return;
 		}
 
-		// Sementara dummy auth
-		// Nanti bisa diganti ke Supabase Auth / tabel officers
-		if (officerId === 'ABCD' && password === '123456') {
-			localStorage.setItem(
-				'officerSession',
-				JSON.stringify({
-					officerId,
-					name: 'Christian',
-					desk: 'Loket 1',
-					location: 'Puskesmas'
-				})
-			);
-			window.location.href = '/officer/desk';
+		const { data, error: fetchError } = await supabase
+			.from('officers')
+			.select('*, service_locations(name)')
+			.eq('email', email)
+			.eq('password', password)
+			.single();
+
+		if (fetchError || !data) {
+			console.log('fetchError:', fetchError);
+			error = 'Login gagal. Email atau password salah.';
 			return;
 		}
 
-		error = 'Login gagal.';
+		localStorage.setItem(
+			'officerSession',
+			JSON.stringify({
+				officerId: data.id,
+				name: data.name,
+				location: data.service_locations.name,
+				serviceLocationId: data.service_location_id
+			})
+		);
+
+		window.location.href = '/officer/desk';
 	}
 </script>
 
@@ -37,7 +44,7 @@
 	<article class="login-card">
 		<h2>Welcome!</h2>
 
-		<input bind:value={officerId} type="text" placeholder="Officer ID" />
+		<input bind:value={email} type="text" placeholder="Email" />
 		<input bind:value={password} type="password" placeholder="Password" />
 
 		{#if error}

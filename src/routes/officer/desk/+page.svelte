@@ -26,6 +26,15 @@
 	async function loadDeskState() {
 		loading = true;
 
+		// Checking registration status
+		const { data: locData } = await supabase
+			.from('service_locations')
+			.select('is_registration_open')
+			.eq('id', officer.serviceLocationId)
+			.single();
+
+		registrationOpen = locData?.is_registration_open ?? true;
+
 		// Current serving
 		const { data: servingData } = await supabase
 			.from('queues')
@@ -62,13 +71,9 @@
 	function subscribeRealtime() {
 		supabase
 			.channel('officer-queue-channel')
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'queues' },
-				async () => {
-					await loadDeskState();
-				}
-			)
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, async () => {
+				await loadDeskState();
+			})
 			.subscribe();
 	}
 
@@ -77,13 +82,12 @@
 		if (currentQueue) return;
 
 		const now = new Date().toISOString();
-		
 
 		const { error } = await supabase
 			.from('queues')
 			.update({
 				status: 'serving',
-				start_serving_at: now,
+				start_serving_at: now
 			})
 			.eq('id', nextQueue.id);
 
@@ -102,7 +106,7 @@
 			.update({
 				status: 'skipped',
 				skip_count: (currentQueue.skip_count || 0) + 1,
-				finish_serving_at: now,
+				finish_serving_at: now
 			})
 			.eq('id', currentQueue.id);
 
@@ -121,22 +125,71 @@
 			.from('queues')
 			.update({
 				status: 'served',
-				finish_serving_at: now,
+				finish_serving_at: now
 			})
 			.eq('id', currentQueue.id);
 
 		if (!error) {
 			currentQueue = null;
+			await updateAvgDuration();
 			await loadDeskState();
 		}
 	}
 
+	async function updateAvgDuration() {
+		// Ambil 5 sesi terakhir yang sudah selesai
+		const { data: recentQueues } = await supabase
+			.from('queues')
+			.select('start_serving_at, finish_serving_at, service_type_id')
+			.eq('status', 'served')
+			.not('start_serving_at', 'is', null)
+			.not('finish_serving_at', 'is', null)
+			.order('finish_serving_at', { ascending: false })
+			.limit(5);
+
+		if (!recentQueues || recentQueues.length === 0) return;
+
+		// Hitung WMA:` bobot lebih besar untuk yang terbaru
+		const weights = [5, 4, 3, 2, 1];
+		let totalWeight = 0;
+		let weightedSum = 0;
+
+		recentQueues.forEach((q, i) => {
+			const duration = (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000;
+			const weight = weights[i] || 1;
+			weightedSum += duration * weight;
+			totalWeight += weight;
+		});
+
+		const newAvgDuration = Math.round(weightedSum / totalWeight);
+
+		// Update avg_duration di service_types
+		await supabase
+			.from('service_types')
+			.update({ avg_duration: newAvgDuration })
+			.eq('service_location_id', officer.serviceLocationId);
+
+		averageMinutes = newAvgDuration;
+	}
+
 	async function closeRegistration() {
+		console.log('serviceLocationId:', officer.serviceLocationId);
+
+		await supabase
+			.from('service_locations')
+			.update({ is_registration_open: false })
+			.eq('id', officer.serviceLocationId);
+
 		registrationOpen = false;
 		showCloseConfirm = false;
 	}
 
-	function reopenRegistration() {
+	async function reopenRegistration() {
+		await supabase
+			.from('service_locations')
+			.update({ is_registration_open: true })
+			.eq('id', officer.serviceLocationId);
+
 		registrationOpen = true;
 	}
 
@@ -144,30 +197,7 @@
 		localStorage.removeItem('officerSession');
 		window.location.href = '/officer/login';
 	}
-
-	
 </script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 {#if loading}
 	<main class="page"><p>Loading...</p></main>
@@ -241,10 +271,12 @@
 				<article class="served-list">
 					<h6>Client Served:</h6>
 					<ol reversed>
-						{#each servedQueues as item}
+						{#each servedQueues as item (item.id)}
 							<li>
 								{item.queue_number} - {item.nik_hash || 'No NIK'} - {item.wa_number || '-'}
-								{#if item.status === 'skipped'} (Skipped){/if}
+								{#if item.status === 'skipped'}
+									(Skipped)
+								{/if}
 							</li>
 						{/each}
 					</ol>
@@ -261,9 +293,7 @@
 					<h2>CLOSED</h2>
 					<p>You have closed the registration.</p>
 
-					<button class = "reopen-btn" on:click={reopenRegistration}>
-						Reopen Registration
-					</button>
+					<button class="reopen-btn" on:click={reopenRegistration}> Reopen Registration </button>
 				</div>
 			</section>
 		{/if}
@@ -281,24 +311,6 @@
 		{/if}
 	</main>
 {/if}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 <style>
 	.page {
@@ -461,7 +473,7 @@
 	}
 
 	.reopen-btn {
-	margin-top: 1rem;
-	width: 100%;
+		margin-top: 1rem;
+		width: 100%;
 	}
 </style>

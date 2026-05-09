@@ -16,9 +16,14 @@
 		loading = true;
 		const id = $page.params.id;
 
-		const { data } = await supabase.from('service_locations').select('*').eq('id', id).single();
+		const { data } = await supabase
+			.from('service_locations')
+			.select('*, is_registration_open')
+			.eq('id', id)
+			.single();
 
 		location = data;
+		serviceTypes = [];
 
 		const { data: types } = await supabase
 			.from('service_types')
@@ -31,6 +36,11 @@
 
 	async function takeQueue() {
 		error = '';
+
+		if (!location.is_registration_open) {
+			error = 'Registration is currently closed for this location.';
+			return;
+		}
 
 		if (!nik || nik.length !== 16 || !/^\d+$/.test(nik)) {
 			error = 'NIK must be 16 digits.';
@@ -128,6 +138,10 @@
 			{/each}
 		</select>
 
+		{#if !location.is_registration_open}
+			<div class="closed-alert">⚠️ Registration is currently closed for this location.</div>
+		{/if}
+
 		{#if error}
 			<p class="error">{error}</p>
 		{/if}
@@ -187,6 +201,15 @@
 	input,
 	select {
 		width: 100%;
+	}
+
+	.closed-alert {
+		background: #e53935;
+		color: white;
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		text-align: center;
+		font-size: 0.9rem;
 	}
 
 	.error {
