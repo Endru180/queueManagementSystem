@@ -103,6 +103,17 @@
 			return;
 		}
 
+		await fetch('http://localhost:3000/send-whatsapp', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				target: newQueue.wa_number,
+				message: `Your queue number is ${newQueue.queue_number}`
+			})
+		});
+
 		const existingIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
 		existingIds.push(newQueue.id);
 		localStorage.setItem('myQueueIds', JSON.stringify(existingIds));
