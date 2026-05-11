@@ -67,6 +67,13 @@
 	$: isNearby = myQueue && myQueue.queue_number - (currentNumber ?? 0) <= 3;
 
 	onMount(() => {
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
+
+		if (!session || session.role !== 'client') {
+			window.location.href = '/login';
+			return;
+		}
 		const queueId = $page.url.searchParams.get('queueId');
 		if (queueId) {
 			fetchQueueData(queueId);

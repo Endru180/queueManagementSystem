@@ -12,13 +12,16 @@
 	let showCloseConfirm = false;
 
 	onMount(async () => {
-		const raw = localStorage.getItem('officerSession');
-		if (!raw) {
-			window.location.href = '/officer/login';
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
+
+		if (!session || session.role !== 'officer') {
+			window.location.href = '/login';
 			return;
 		}
 
-		officer = JSON.parse(raw);
+		officer = session;
+	
 		await loadDeskState();
 		subscribeRealtime();
 	});
@@ -194,8 +197,8 @@
 	}
 
 	function logout() {
-		localStorage.removeItem('officerSession');
-		window.location.href = '/officer/login';
+		localStorage.removeItem('userSession');
+		window.location.href = '/login';
 	}
 </script>
 

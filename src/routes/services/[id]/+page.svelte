@@ -121,6 +121,13 @@
 	}
 
 	onMount(() => {
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
+
+		if (!session || session.role !== 'client') {
+			window.location.href = '/login';
+			return;
+		}
 		fetchLocation();
 	});
 </script>

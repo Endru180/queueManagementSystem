@@ -59,6 +59,13 @@
 	}
 
 	onMount(() => {
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
+
+		if (!session || session.role !== 'client') {
+			window.location.href = '/login';
+			return;
+		}
 		const lat = localStorage.getItem('userLat');
 		const lng = localStorage.getItem('userLng');
 		if (lat && lng) {
