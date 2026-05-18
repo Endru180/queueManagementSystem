@@ -1,48 +1,55 @@
 <script>
+	import { supabase } from '$lib/supabase.js';
 	let role = '';
-	let userId = '';
+	let email = '';
 	let password = '';
 	let error = '';
 
-	function login() {
+	async function login() {
 		error = '';
 
-		if (!role || !userId || !password) {
-			error = 'Please select role and fill ID/password.';
+		if (!role || !email || !password) {
+			error = 'Please select role, enter email, and password.';
 			return;
 		}
 
-		// Dummy info
-		if (role === 'officer' && userId === 'ABCD' && password === '123456') {
-			localStorage.setItem(
-				'userSession',
-				JSON.stringify({
-					role: 'officer',
-					id: userId,
-					name: 'Officer Demo'
-				})
-			);
+		let tableName = role === 'officer' ? 'officers' : 'clients';
 
+		const { data, error: loginError } = await supabase
+			.from(tableName)
+			.select('*')
+			.eq('email', email)
+			.eq('password', password)
+			.single();
+
+		console.log('table:', tableName);
+		console.log('email:', email);
+		console.log('data:', data);
+		console.log('error:', loginError);
+
+		if (loginError || !data) {
+			error = 'Invalid email or password.';
+			return;
+		}
+
+		localStorage.setItem(
+			'userSession',
+			JSON.stringify({
+				role,
+				id: data.id,
+				name: data.name,
+				email: data.email,
+				service_location_id: data.service_location_id || null
+			})
+		);
+
+		if (role === 'officer') {
 			window.location.href = '/officer/desk';
-			return;
-		}
-        // Dummy info
-		if (role === 'client' && userId === 'ABCD' && password === '123456') {
-			localStorage.setItem(
-				'userSession',
-				JSON.stringify({
-					role: 'client',
-					id: userId,
-					name: 'Client Demo'
-				})
-			);
-
+		} else {
 			window.location.href = '/';
-			return;
 		}
-
-		error = 'Invalid ID or password.';
 	}
+			
 </script>
 
 <main class="login-page">
@@ -55,7 +62,7 @@
 			<option value="officer">Officer</option>
 		</select>
 
-		<input bind:value={userId} placeholder="ID" />
+		<input bind:value={email} placeholder="Email" />
 		<input bind:value={password} type="password" placeholder="Password" />
 
 		{#if error}

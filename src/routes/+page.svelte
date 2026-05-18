@@ -1,6 +1,16 @@
 <script>
 	import { supabase } from '$lib/supabase.js';
 	import { onMount } from 'svelte';
+	import { browser, dev } from '$app/environment';
+
+	if (browser && dev) {
+		const lastReload = sessionStorage.getItem('devReloaded');
+
+		if (!lastReload) {
+			localStorage.clear();
+			sessionStorage.setItem('devReloaded', 'true');
+		}
+	}
 
 	let provinces = [];
 	let cities = [];
@@ -63,7 +73,7 @@
 		}
 	});
 
-	let gpsDenied = false;
+	let gpsDenied = true;
 	let showToast = false;
 	let manualLocation = {
 		province: '',

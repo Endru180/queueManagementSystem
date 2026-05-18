@@ -11,6 +11,14 @@
 	let loading = true;
 	let showCloseConfirm = false;
 
+	//walk in clients
+	let showWalkInForm = false;
+	let walkInNik = '';
+	let walkInWa = '';
+	let walkInServiceType = '';
+	let serviceTypes = [];
+	let walkInError = '';
+
 	onMount(async () => {
 		const raw = localStorage.getItem('userSession');
 		const session = raw ? JSON.parse(raw) : null;
@@ -21,10 +29,84 @@
 		}
 
 		officer = session;
-	
+		
+		await loadServiceTypes();
 		await loadDeskState();
 		subscribeRealtime();
 	});
+
+
+	async function loadServiceTypes() {
+		const { data } = await supabase
+			.from('service_types')
+			.select('*')
+			.eq('service_location_id', officer.service_location_id);
+
+		serviceTypes = data || [];
+	}
+
+	async function addWalkInQueue() {
+		walkInError = '';
+
+		if (!walkInNik || walkInNik.length !== 16 || !/^\d+$/.test(walkInNik)) {
+			walkInError = 'NIK must be 16 digits.';
+			return;
+		}
+
+		if (!walkInWa || !/^(08|628)\d{8,11}$/.test(walkInWa)) {
+			walkInError = 'WhatsApp number is invalid.';
+			return;
+		}
+
+		if (!walkInServiceType) {
+			walkInError = 'Please select service type.';
+			return;
+		}
+
+		const encoder = new TextEncoder();
+		const data = encoder.encode(walkInNik);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashArray = Array.from(new Uint8Array(hashBuffer));
+		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+		const { data: queueNumber } = await supabase.rpc('get_next_queue_number', {
+			loc_id: officer.service_location_id
+		});
+
+		const { data: newQueue, error } = await supabase
+			.from('queues')
+			.insert({
+				service_type_id: walkInServiceType,
+				nik_hash: nikHash,
+				wa_number: walkInWa,
+				queue_number: queueNumber,
+				status: 'waiting'
+			})
+			.select()
+			.single();
+
+		if (error) {
+			walkInError = 'Failed to add walk-in queue.';
+			return;
+		}
+
+		await fetch('http://localhost:3000/send-whatsapp', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				target: newQueue.wa_number,
+				message: `Your queue number is ${newQueue.queue_number}`
+			})
+		});
+
+		walkInNik = '';
+		walkInWa = '';
+		walkInServiceType = '';
+		showWalkInForm = false;
+
+		await loadDeskState();
+	}
+
 
 	async function loadDeskState() {
 		loading = true;
@@ -214,6 +296,28 @@
 		</header>
 
 		{#if registrationOpen}
+			<button class="outline" on:click={() => (showWalkInForm = !showWalkInForm)}>
+				{showWalkInForm ? 'Cancel Walk-in' : 'Add Walk-in'}
+			</button>
+			
+			{#if showWalkInForm}
+				<div class="walk-in-form">
+					<input bind:value={walkInNik} placeholder="NIK (16 digits)" />
+					<input bind:value={walkInWa} placeholder="WhatsApp Number" />
+					<select bind:value={walkInServiceType}>
+						<option value="" disabled selected>Select Service Type</option>
+						{#each serviceTypes as type}
+							<option value={type.id}>{type.name}</option>
+						{/each}
+					</select>
+					<button on:click={addWalkInQueue}>Add to Queue</button>
+
+					{#if walkInError}
+						<p class="error">{walkInError}</p>
+					{/if}
+				</div>
+			{/if}
+
 			<section class="panel main-grid">
 				<div class="queue-box">
 					<p class="label">Serving</p>
@@ -462,6 +566,24 @@
 		gap: 0.75rem;
 		justify-content: center;
 		margin-top: 1rem;
+	}
+
+	.outline {
+		width: 100%;
+		margin-bottom: 1rem;
+	}
+
+	.outline {
+		background: white;
+		border: 1px solid #cfcfcf;
+		border-radius: 12px;
+		padding: 1rem;
+		margin-bottom: 1rem;
+	}
+
+	.error {
+		color: red;
+		font-size: 0.85rem;
 	}
 
 	@media (max-width: 768px) {
