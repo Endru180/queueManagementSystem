@@ -12,6 +12,12 @@
 	let submitting = false;
 	let error = '';
 
+
+	function logout() {
+		localStorage.removeItem('userSession');
+		window.location.href = '/login';
+	}
+
 	async function fetchLocation() {
 		loading = true;
 		const id = $page.params.id;
@@ -58,6 +64,7 @@
 		const confirmed = confirm('Are you sure you want to take a queue?');
 		if (!confirmed) return;
 
+
 		submitting = true;
 
 		const encoder = new TextEncoder();
@@ -85,11 +92,13 @@
 		});
 
 		const queueNumber = queueData;
-
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
 		const { data: newQueue, error: insertError } = await supabase
 			.from('queues')
 			.insert({
 				service_type_id: selectedServiceType,
+				client_id: session.id,
 				nik_hash: nikHash,
 				wa_number: waNumber,
 				queue_number: queueNumber
@@ -138,9 +147,15 @@
 	</main>
 {:else if location}
 	<main>
+		<div class="topbar">
+			<button class="logout-btn" onclick={logout}>
+				Logout
+			</button>
+		</div>
+
 		<div class="header">
 			<button class="back" onclick={() => window.history.back()}>←</button>
-			<span>{location.name}</span>
+			<span>Services</span>
 		</div>
 
 		<label for="nik">Enter your NIK</label>
@@ -252,5 +267,15 @@
 	.take-queue:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.topbar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 1rem;
+	}
+
+	.logout-btn {
+		width: auto;
 	}
 </style>

@@ -35,6 +35,62 @@
 		subscribeRealtime();
 	});
 
+	function calculateWMA(queues) {
+		const finishedQueues = queues
+			.filter((q) => q.start_serving_at && q.finish_serving_at)
+			.map((q) => {
+				const start = new Date(q.start_serving_at);
+				const finish = new Date(q.finish_serving_at);
+				const duration = (finish - start) / 60000; // minutes
+
+				return duration;
+			})
+			.filter((duration) => duration > 0 && duration <= 60); // outlier filter
+
+		if (finishedQueues.length === 0) return 7;
+
+		const latest = finishedQueues.slice(0, 5);
+
+		let weightedTotal = 0;
+		let weightTotal = 0;
+
+		latest.forEach((duration, index) => {
+			const weight = latest.length - index;
+			weightedTotal += duration * weight;
+			weightTotal += weight;
+		});
+
+		return Math.round(weightedTotal / weightTotal);
+	}
+
+
+	async function notifyUpcomingQueues() {
+		const { data: upcomingQueues } = await supabase
+			.from('queues')
+			.select('*')
+			.eq('status', 'waiting')
+			.order('queue_number', { ascending: true })
+			.limit(3);
+
+		if (!upcomingQueues || upcomingQueues.length === 0) return;
+
+		for (let i = 0; i < upcomingQueues.length; i++) {
+			const queue = upcomingQueues[i];
+			const estimatedWait = averageMinutes * (i + 1);
+
+			await fetch('http://localhost:3000/send-whatsapp', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					target: queue.wa_number,
+					message: `Queue Update: Your Queue ${queue.queue_number}. Estimasi Waiting Time: ${estimatedWait} minutes.`
+				})
+			});
+		}
+	}
+
 
 	async function loadServiceTypes() {
 		const { data } = await supabase
@@ -82,7 +138,7 @@
 				queue_number: queueNumber,
 				status: 'waiting'
 			})
-			.select()
+			.select('*, clients(name, email)')
 			.single();
 
 		if (error) {
@@ -123,7 +179,7 @@
 		// Current serving
 		const { data: servingData } = await supabase
 			.from('queues')
-			.select('*')
+			.select('*, clients(name, email)')
 			.eq('status', 'serving')
 			.order('start_serving_at', { ascending: true })
 			.limit(1);
@@ -133,7 +189,7 @@
 		// Next waiting
 		const { data: nextData } = await supabase
 			.from('queues')
-			.select('*')
+			.select('*, clients(name, email)')
 			.eq('status', 'waiting')
 			.order('queue_number', { ascending: true })
 			.limit(1);
@@ -143,12 +199,13 @@
 		// Recently served
 		const { data: servedData } = await supabase
 			.from('queues')
-			.select('*')
+			.select('*, clients(name, email)')
 			.in('status', ['served', 'skipped'])
 			.order('finish_serving_at', { ascending: false })
-			.limit(6);
+			.limit(10);
 
 		servedQueues = servedData || [];
+		averageMinutes = calculateWMA(servedQueues);
 
 		loading = false;
 	}
@@ -186,11 +243,55 @@
 
 		const now = new Date().toISOString();
 
+		const newSkipCount = (currentQueue.skip_count || 0) + 1;
+
+		if (newSkipCount >= 3) {
+
+			await fetch('http://localhost:3000/send-whatsapp', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					target: currentQueue.wa_number,
+					message: `Your Queue number has been skipped 3 times and removed from the queue. Please register again if you still want to be served.`
+				})
+			});
+
+			const { error } = await supabase
+				.from('queues')
+				.update({
+					status: 'skipped',
+					skip_count: newSkipCount,
+					finish_serving_at: now
+				})
+				.eq('id', currentQueue.id);
+
+			if (!error) {
+				currentQueue = null;
+				await loadDeskState();
+			}
+
+
+			return;
+		}
+
+		const { data: maxQueue } = await supabase
+			.from('queues')
+			.select('queue_number')
+			.eq('service_location_id', officer.service_location_id)
+			.order('queue_number', { ascending: false })
+			.limit(1)
+			.single(); 
+
+		const newQueueNumber = (maxQueue?.queue_number || currentQueue.queue_number) + 3;
+
 		const { error } = await supabase
 			.from('queues')
 			.update({
-				status: 'skipped',
-				skip_count: (currentQueue.skip_count || 0) + 1,
+				status: 'waiting',
+				queue_number: newQueueNumber,
+				skip_count: newSkipCount,
 				finish_serving_at: now
 			})
 			.eq('id', currentQueue.id);
@@ -218,6 +319,7 @@
 			currentQueue = null;
 			await updateAvgDuration();
 			await loadDeskState();
+			await notifyUpcomingQueues();
 		}
 	}
 
@@ -331,7 +433,7 @@
 
 					{#if currentQueue}
 						<div class="mini-card">
-							<strong>{currentQueue.nik_hash || 'No NIK'}</strong><br />
+							<strong>{currentQueue.clients?.name || currentQueue.clients?.email || 'Walk-in Client'}</strong><br />
 							{currentQueue.wa_number || '-'}
 						</div>
 					{/if}
@@ -353,7 +455,7 @@
 
 					{#if nextQueue}
 						<div class="mini-card">
-							<strong>{nextQueue.nik_hash || 'No NIK'}</strong><br />
+							<strong>{nextQueue.clients?.name || nextQueue.clients?.email || 'Walk-in Client'}</strong><br />
 							{nextQueue.wa_number || '-'}
 						</div>
 					{/if}
@@ -380,7 +482,7 @@
 					<ol reversed>
 						{#each servedQueues as item (item.id)}
 							<li>
-								{item.queue_number} - {item.nik_hash || 'No NIK'} - {item.wa_number || '-'}
+								{item.queue_number} - {item.clients?.name || item.clients?.email || 'No Client'} - {item.wa_number || '-'}
 								{#if item.status === 'skipped'}
 									(Skipped)
 								{/if}

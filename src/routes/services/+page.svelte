@@ -21,6 +21,11 @@
 				Math.sin(dLng / 2);
 		return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	}
+	
+	function logout() {
+		localStorage.removeItem('userSession');
+		window.location.href = '/login';
+	}
 
 	async function fetchLocations() {
 		if (!category) return;
@@ -79,6 +84,18 @@
 </script>
 
 <main>
+
+	<div class="topbar">
+		<button class="logout-btn" onclick={logout}>
+			Logout
+		</button>
+	</div>
+
+	<div class="header">
+			<button class="back" onclick={() => window.history.back()}>←</button>
+			<span>Services</span>
+	</div>
+
 	<select bind:value={category} onchange={() => fetchLocations()}>
 		<option value="" disabled selected>Select a service</option>
 		<option value="Puskesmas">Puskesmas</option>
@@ -156,4 +173,38 @@
 		white-space: nowrap;
 		margin-left: 1rem;
 	}
+
+	.header {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+		margin-bottom: 1rem;
+		font-weight: bold;
+	}
+
+	.back {
+		background: white !important;
+		border: none !important;
+		border-radius: 50% !important;
+		width: 36px !important;
+		height: 36px !important;
+		font-size: 1.1rem !important;
+		cursor: pointer !important;
+		color: black !important;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding-top: 11px;
+	}
+
+	.topbar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 1rem;
+	}
+
+	.logout-btn {
+		width: auto;
+	}
+
 </style>

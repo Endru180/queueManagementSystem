@@ -16,6 +16,12 @@
 	let cities = [];
 	let subdistricts = [];
 
+
+	function logout() {
+		localStorage.removeItem('userSession');
+		window.location.href = '/login';
+	}
+
 	async function loadProvinces() {
 		const { data } = await supabase.from('provinces').select('*').order('name');
 		provinces = data || [];
@@ -189,6 +195,13 @@
 
 <!-- Main Content -->
 <main>
+
+	<div class="topbar">
+		<button class="logout-btn" onclick={logout}>
+			Logout
+		</button>
+	</div>
+
 	<select
 		disabled={!locationReady}
 		onchange={(e) => {
@@ -202,6 +215,8 @@
 		<option value="Bank">Bank</option>
 		<option value="Kelurahan">Kelurahan</option>
 	</select>
+
+	
 
 	{#if gpsDenied}
 		<div class="manual-location">
@@ -389,4 +404,15 @@
 		margin-bottom: 0.5rem;
 		color: black;
 	}
+
+	.topbar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 1rem;
+	}
+
+	.logout-btn {
+		width: auto;
+	}
+
 </style>
