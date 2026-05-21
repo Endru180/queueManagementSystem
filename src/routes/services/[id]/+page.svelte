@@ -41,7 +41,6 @@
 			error = 'Registration is currently closed for this location.';
 			return;
 		}
-
 		if (!nik || nik.length !== 16 || !/^\d+$/.test(nik)) {
 			error = 'NIK must be 16 digits.';
 			return;

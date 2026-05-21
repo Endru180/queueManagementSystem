@@ -23,6 +23,14 @@
 		subscribeRealtime();
 	});
 
+	async function getServiceTypeIds() {
+		const { data } = await supabase
+			.from('service_types')
+			.select('id')
+			.eq('service_location_id', officer.serviceLocationId);
+		return data?.map((st) => st.id) || [];
+	}
+
 	async function loadDeskState() {
 		loading = true;
 
@@ -34,12 +42,14 @@
 			.single();
 
 		registrationOpen = locData?.is_registration_open ?? true;
+		const ids = await getServiceTypeIds();
 
 		// Current serving
 		const { data: servingData } = await supabase
 			.from('queues')
 			.select('*')
 			.eq('status', 'serving')
+			.in('service_type_id', ids)
 			.order('start_serving_at', { ascending: true })
 			.limit(1);
 
@@ -50,6 +60,7 @@
 			.from('queues')
 			.select('*')
 			.eq('status', 'waiting')
+			.in('service_type_id', ids)
 			.order('queue_number', { ascending: true })
 			.limit(1);
 
@@ -60,6 +71,7 @@
 			.from('queues')
 			.select('*')
 			.in('status', ['served', 'skipped'])
+			.in('service_type_id', ids)
 			.order('finish_serving_at', { ascending: false })
 			.limit(6);
 
@@ -92,6 +104,36 @@
 			.eq('id', nextQueue.id);
 
 		if (!error) {
+			// Cek apakah ada skipped queue yang perlu di-requeue
+			// Ambil queue number saat ini
+			const currentQueueNumber = nextQueue.queue_number;
+
+			// Cari skipped queues yang di-skip sebelum 3 orang lalu
+			const { data: skippedQueues } = await supabase
+				.from('queues')
+				.select('*')
+				.eq('status', 'skipped')
+				.lt('queue_number', currentQueueNumber - 3);
+
+			if (skippedQueues && skippedQueues.length > 0) {
+				// Ambil queue number tertinggi saat ini
+				const { data: lastQueue } = await supabase.rpc('get_next_queue_number', {
+					loc_id: officer.serviceLocationId
+				});
+
+				// Requeue — set status waiting dengan nomor baru
+				for (const sq of skippedQueues) {
+					await supabase
+						.from('queues')
+						.update({
+							status: 'waiting',
+							queue_number: lastQueue,
+							skip_count: sq.skip_count
+						})
+						.eq('id', sq.id);
+				}
+			}
+
 			await loadDeskState();
 		}
 	}
@@ -100,12 +142,14 @@
 		if (!currentQueue) return;
 
 		const now = new Date().toISOString();
+		const newSkipCount = (currentQueue.skip_count || 0) + 1;
+		const newStatus = newSkipCount >= 3 ? 'forfeited' : 'skipped';
 
 		const { error } = await supabase
 			.from('queues')
 			.update({
-				status: 'skipped',
-				skip_count: (currentQueue.skip_count || 0) + 1,
+				status: newStatus,
+				skip_count: newSkipCount,
 				finish_serving_at: now
 			})
 			.eq('id', currentQueue.id);
@@ -114,6 +158,15 @@
 			currentQueue = null;
 			await loadDeskState();
 		}
+	}
+
+	async function hardCase() {
+		const confirmed = confirm('Add 15 minutes buffer for all waiting queues?');
+		if (!confirmed) return;
+
+		const ids = await getServiceTypeIds();
+
+		await supabase.from('service_types').update({ delay_minutes: 15 }).in('id', ids);
 	}
 
 	async function finishCurrent() {
@@ -149,13 +202,24 @@
 
 		if (!recentQueues || recentQueues.length === 0) return;
 
-		// Hitung WMA:` bobot lebih besar untuk yang terbaru
+		// Hitung rata-rata sementara dulu
+		const durations = recentQueues.map(
+			(q) => (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000
+		);
+
+		const tempAvg = durations.reduce((a, b) => a + b, 0) / durations.length;
+
+		// Filter outlier — hapus durasi yang melebihi 2x rata-rata
+		const filtered = durations.filter((d) => d <= 2 * tempAvg);
+
+		if (filtered.length === 0) return;
+
+		// Hitung WMA dari data yang sudah difilter
 		const weights = [5, 4, 3, 2, 1];
 		let totalWeight = 0;
 		let weightedSum = 0;
 
-		recentQueues.forEach((q, i) => {
-			const duration = (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000;
+		filtered.forEach((duration, i) => {
 			const weight = weights[i] || 1;
 			weightedSum += duration * weight;
 			totalWeight += weight;
@@ -173,8 +237,6 @@
 	}
 
 	async function closeRegistration() {
-		console.log('serviceLocationId:', officer.serviceLocationId);
-
 		await supabase
 			.from('service_locations')
 			.update({ is_registration_open: false })
@@ -261,6 +323,9 @@
 				</div>
 
 				<div class="close-box">
+					{#if currentQueue}
+						<button class="outline warning" on:click={hardCase}> Hard Case </button>
+					{/if}
 					<button class="outline danger" on:click={() => (showCloseConfirm = true)}>
 						Close Registration
 					</button>
@@ -391,6 +456,11 @@
 	.finish-btn {
 		background: #1d7ddc;
 		border-color: #1d7ddc;
+	}
+
+	.warning {
+		color: #ff9800;
+		border-color: #ff9800;
 	}
 
 	.close-box {

@@ -21,7 +21,6 @@
 			.single();
 
 		if (fetchError || !data) {
-			console.log('fetchError:', fetchError);
 			error = 'Login gagal. Email atau password salah.';
 			return;
 		}
@@ -73,6 +72,7 @@
 
 	h2 {
 		margin-bottom: 1.5rem;
+		color: black;
 	}
 
 	input {
