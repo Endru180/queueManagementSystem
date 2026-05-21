@@ -72,6 +72,7 @@
 </script>
 
 <main>
+	<button class="back-btn" onclick={() => window.history.back()}>Back</button>
 	<select bind:value={category} onchange={() => fetchLocations()}>
 		<option value="" disabled selected>Select a service</option>
 		<option value="Puskesmas">Puskesmas</option>
@@ -104,6 +105,18 @@
 		min-height: 100vh;
 		padding: 1rem;
 		background: linear-gradient(to bottom, #d0d0d0, #f5f5f5);
+	}
+
+	.back-btn {
+		background: white;
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		font-size: 0.9rem;
+		cursor: pointer;
+		color: black;
+		margin-bottom: 1rem;
+		box-shadow: 2px 2px 0px #00000022;
 	}
 
 	select {

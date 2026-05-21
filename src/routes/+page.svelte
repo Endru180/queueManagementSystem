@@ -49,6 +49,8 @@
 	});
 
 	let showToast = false;
+	let locationConfirmed = false;
+	$: locationReady = locationConfirmed;
 	let manualLocation = {
 		province: '',
 		city: '',
@@ -61,11 +63,16 @@
 	function checkAndShowToast() {
 		if (manualLocation.province && manualLocation.city && manualLocation.district) {
 			showToast = true;
-			setTimeout(() => (showToast = false), 3000);
 		}
 	}
 
+	function confirmLocation() {
+		locationConfirmed = true;
+		showToast = false;
+	}
+
 	function onProvinceSelect(e) {
+		locationConfirmed = false;
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.province = opt.value;
 		manualLocation.provinceName = opt.text;
@@ -74,6 +81,7 @@
 	}
 
 	function onCitySelect(e) {
+		locationConfirmed = false;
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.city = opt.value;
 		manualLocation.cityName = opt.text;
@@ -82,6 +90,7 @@
 	}
 
 	function onSubdistrictSelect(e) {
+		locationConfirmed = false;
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.district = opt.value;
 		manualLocation.districtName = opt.text;
@@ -148,23 +157,12 @@
 		<p>
 			📍 Location set: {manualLocation.provinceName}, {manualLocation.cityName}, {manualLocation.districtName}
 		</p>
+		<button onclick={confirmLocation}>Confirm</button>
 	</div>
 {/if}
 
 <!-- Main Content -->
 <main>
-	<select
-		onchange={(e) => {
-			const val = e.currentTarget.value;
-			if (val) window.location.href = `/services?category=${val}`;
-		}}
-	>
-		<option value="" disabled selected>Select a service</option>
-		<option value="Puskesmas">Puskesmas</option>
-		<option value="Samsat">Samsat</option>
-		<option value="Bank">Bank</option>
-		<option value="Kelurahan">Kelurahan</option>
-	</select>
 	<div class="manual-location">
 		<select onchange={onProvinceSelect}>
 			<option value="" disabled selected>Select Province</option>
@@ -187,6 +185,19 @@
 			{/each}
 		</select>
 	</div>
+	<select
+		disabled={!locationReady}
+		onchange={(e) => {
+			const val = e.currentTarget.value;
+			if (val) window.location.href = `/services?category=${val}`;
+		}}
+	>
+		<option value="" disabled selected>Select a service</option>
+		<option value="Puskesmas">Puskesmas</option>
+		<option value="Samsat">Samsat</option>
+		<option value="Bank">Bank</option>
+		<option value="Kelurahan">Kelurahan</option>
+	</select>
 	<div class="app-name">
 		<p>NamaAplikasinya.com</p>
 	</div>
@@ -338,6 +349,16 @@
 
 	.toast p {
 		margin: 0;
+	}
+
+	.toast button {
+		background: white;
+		color: #333;
+		border: none;
+		border-radius: 8px;
+		padding: 0.4rem 1rem;
+		cursor: pointer;
+		font-weight: bold;
 	}
 
 	h3 {

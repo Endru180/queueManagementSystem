@@ -267,7 +267,7 @@
 	<main class="page">
 		<header class="topbar">
 			<div>
-				<strong>{officer?.name}</strong> - {officer?.officerId} - {officer?.location}
+				<strong>{officer?.name}</strong> - {officer?.location}
 			</div>
 			<button class="icon-btn secondary" on:click={logout}>Logout</button>
 		</header>

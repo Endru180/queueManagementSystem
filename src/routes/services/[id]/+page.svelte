@@ -131,7 +131,7 @@
 {:else if location}
 	<main>
 		<div class="header">
-			<button class="back" onclick={() => window.history.back()}>←</button>
+			<button class="back" onclick={() => window.history.back()}>Back</button>
 			<span>{location.name}</span>
 		</div>
 
@@ -188,19 +188,21 @@
 		font-weight: bold;
 	}
 
-	.back {
-		background: white !important;
-		border: none !important;
-		border-radius: 50% !important;
-		width: 36px !important;
-		height: 36px !important;
-		font-size: 1.1rem !important;
-		cursor: pointer !important;
-		color: black !important;
+	.header span {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		padding-top: 11px;
+	}
+
+	.back {
+		background: white;
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		font-size: 0.9rem;
+		cursor: pointer;
+		color: black;
+		margin-bottom: 1rem;
+		box-shadow: 2px 2px 0px #00000022;
 	}
 
 	label {
