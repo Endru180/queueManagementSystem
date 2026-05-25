@@ -297,6 +297,19 @@
 			.eq('id', currentQueue.id);
 
 		if (!error) {
+
+			await fetch('http://localhost:3000/send-whatsapp', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					target: currentQueue.wa_number,
+					message: `Your queue has been skipped.\nYour new queue number is ${newQueueNumber}.\nPlease be ready when your number is called again.`
+				})
+			});
+
+
 			currentQueue = null;
 			await loadDeskState();
 		}
