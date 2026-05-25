@@ -45,8 +45,7 @@
 				JSON.stringify({
 					role: 'client',
 					id: userData.id,
-					nikHash: nikHash,
-					wa_number: userData.wa_number || ''
+					nikHash: nikHash
 				})
 			);
 

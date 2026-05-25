@@ -36,20 +36,26 @@
 	});
 
 	function calculateWMA(queues) {
-		const finishedQueues = queues
+		const durations = queues
 			.filter((q) => q.start_serving_at && q.finish_serving_at)
 			.map((q) => {
 				const start = new Date(q.start_serving_at);
 				const finish = new Date(q.finish_serving_at);
-				const duration = (finish - start) / 60000; // minutes
-
-				return duration;
+				return (finish - start) / 60000;
 			})
-			.filter((duration) => duration > 0 && duration <= 60); // outlier filter
+			.filter((d) => d > 0);
 
-		if (finishedQueues.length === 0) return 7;
+		if (durations.length === 0) return 7;
 
-		const latest = finishedQueues.slice(0, 5);
+		// Hitung rata-rata sementara dulu
+		const tempAvg = durations.reduce((a, b) => a + b, 0) / durations.length;
+
+		// Filter outlier — hapus durasi yang melebihi 2x rata-rata
+		const filtered = durations.filter((d) => d <= 2 * tempAvg);
+
+		if (filtered.length === 0) return 7;
+
+		const latest = filtered.slice(0, 5);
 
 		let weightedTotal = 0;
 		let weightTotal = 0;
@@ -136,7 +142,7 @@
 				queue_number: queueNumber,
 				status: 'waiting'
 			})
-			.select('*, clients(name, email)')
+			.select('*')
 			.single();
 
 		if (error) {
@@ -335,6 +341,10 @@
 			.eq('id', currentQueue.id);
 
 		if (!error) {
+			// Reset delay_minutes ke 0
+			const ids = await getServiceTypeIds();
+			await supabase.from('service_types').update({ delay_minutes: 0 }).in('id', ids);
+
 			currentQueue = null;
 			await updateAvgDuration();
 			await loadDeskState();
@@ -429,11 +439,11 @@
 			<div>
 				<strong>{officer?.name}</strong> - {officer?.location}
 			</div>
-			<button class="icon-btn secondary" on:click={logout}>Logout</button>
+			<button class="icon-btn secondary" onclick={logout}>Logout</button>
 		</header>
 
 		{#if registrationOpen}
-			<button class="outline" on:click={() => (showWalkInForm = !showWalkInForm)}>
+			<button class="outline" onclick={() => (showWalkInForm = !showWalkInForm)}>
 				{showWalkInForm ? 'Cancel Walk-in' : 'Add Walk-in'}
 			</button>
 
@@ -447,7 +457,7 @@
 							<option value={type.id}>{type.name}</option>
 						{/each}
 					</select>
-					<button on:click={addWalkInQueue}>Add to Queue</button>
+					<button onclick={addWalkInQueue}>Add to Queue</button>
 
 					{#if walkInError}
 						<p class="error">{walkInError}</p>
@@ -478,7 +488,7 @@
 					{/if}
 
 					{#if currentQueue}
-						<button class="finish-btn" on:click={finishCurrent}>Finish</button>
+						<button class="finish-btn" onclick={finishCurrent}>Finish</button>
 					{/if}
 				</div>
 
@@ -502,19 +512,19 @@
 					{/if}
 
 					{#if !currentQueue && nextQueue}
-						<button class="serve-btn" on:click={serveNext}>Serve</button>
+						<button class="serve-btn" onclick={serveNext}>Serve</button>
 					{/if}
 
 					{#if currentQueue}
-						<button class="skip-btn" on:click={skipCurrent}>Skip</button>
+						<button class="skip-btn" onclick={skipCurrent}>Skip</button>
 					{/if}
 				</div>
 
 				<div class="close-box">
 					{#if currentQueue}
-						<button class="outline warning" on:click={hardCase}> Hard Case </button>
+						<button class="outline warning" onclick={hardCase}> Hard Case </button>
 					{/if}
-					<button class="outline danger" on:click={() => (showCloseConfirm = true)}>
+					<button class="outline danger" onclick={() => (showCloseConfirm = true)}>
 						Close Registration
 					</button>
 				</div>
@@ -547,7 +557,7 @@
 					<h2>CLOSED</h2>
 					<p>You have closed the registration.</p>
 
-					<button class="reopen-btn" on:click={reopenRegistration}> Reopen Registration </button>
+					<button class="reopen-btn" onclick={reopenRegistration}> Reopen Registration </button>
 				</div>
 			</section>
 		{/if}
@@ -557,8 +567,8 @@
 				<div class="confirm-card">
 					<p><strong>Close Registration?</strong></p>
 					<div class="confirm-actions">
-						<button class="secondary" on:click={() => (showCloseConfirm = false)}>No</button>
-						<button class="contrast" on:click={closeRegistration}>Yes</button>
+						<button class="secondary" onclick={() => (showCloseConfirm = false)}>No</button>
+						<button class="contrast" onclick={closeRegistration}>Yes</button>
 					</div>
 				</div>
 			</div>

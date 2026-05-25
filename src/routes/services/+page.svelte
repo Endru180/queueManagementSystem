@@ -90,7 +90,7 @@
 
 	<div class="header">
 		<button class="back" onclick={() => window.history.back()}>←</button>
-		<span>Services</span>
+		<span>{category || 'Services'}</span>
 	</div>
 
 	<select bind:value={category} onchange={() => fetchLocations()}>
