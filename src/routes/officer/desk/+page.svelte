@@ -20,7 +20,7 @@
 	let walkInError = '';
 
 	onMount(async () => {
-		const raw = localStorage.getItem('userSession');
+		const raw = localStorage.getItem('officerSession');
 		const session = raw ? JSON.parse(raw) : null;
 
 		if (!session || session.role !== 'officer') {
@@ -29,7 +29,7 @@
 		}
 
 		officer = session;
-		
+
 		await loadServiceTypes();
 		await loadDeskState();
 		subscribeRealtime();
@@ -63,7 +63,6 @@
 		return Math.round(weightedTotal / weightTotal);
 	}
 
-
 	async function notifyUpcomingQueues() {
 		const { data: upcomingQueues } = await supabase
 			.from('queues')
@@ -91,13 +90,11 @@
 		}
 	}
 
-
 	async function loadServiceTypes() {
 		const { data } = await supabase
 			.from('service_types')
 			.select('*')
-			.eq('service_location_id', officer.service_location_id);
-
+			.eq('service_location_id', officer.serviceLocationId);
 		serviceTypes = data || [];
 	}
 
@@ -126,7 +123,7 @@
 		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
 		const { data: queueNumber } = await supabase.rpc('get_next_queue_number', {
-			loc_id: officer.service_location_id
+			loc_id: officer.serviceLocationId
 		});
 
 		const { data: newQueue, error } = await supabase
@@ -163,6 +160,13 @@
 		await loadDeskState();
 	}
 
+	async function getServiceTypeIds() {
+		const { data } = await supabase
+			.from('service_types')
+			.select('id')
+			.eq('service_location_id', officer.serviceLocationId);
+		return data?.map((st) => st.id) || [];
+	}
 
 	async function loadDeskState() {
 		loading = true;
@@ -174,6 +178,8 @@
 			.eq('id', officer.serviceLocationId)
 			.single();
 
+		const ids = await getServiceTypeIds();
+
 		registrationOpen = locData?.is_registration_open ?? true;
 
 		// Current serving
@@ -181,6 +187,7 @@
 			.from('queues')
 			.select('*, clients(name, email)')
 			.eq('status', 'serving')
+			.in('service_type_id', ids)
 			.order('start_serving_at', { ascending: true })
 			.limit(1);
 
@@ -191,6 +198,7 @@
 			.from('queues')
 			.select('*, clients(name, email)')
 			.eq('status', 'waiting')
+			.in('service_type_id', ids)
 			.order('queue_number', { ascending: true })
 			.limit(1);
 
@@ -201,6 +209,7 @@
 			.from('queues')
 			.select('*, clients(name, email)')
 			.in('status', ['served', 'skipped'])
+			.in('service_type_id', ids)
 			.order('finish_serving_at', { ascending: false })
 			.limit(10);
 
@@ -246,7 +255,6 @@
 		const newSkipCount = (currentQueue.skip_count || 0) + 1;
 
 		if (newSkipCount >= 3) {
-
 			await fetch('http://localhost:3000/send-whatsapp', {
 				method: 'POST',
 				headers: {
@@ -272,17 +280,16 @@
 				await loadDeskState();
 			}
 
-
 			return;
 		}
 
 		const { data: maxQueue } = await supabase
 			.from('queues')
 			.select('queue_number')
-			.eq('service_location_id', officer.service_location_id)
+			.eq('service_location_id', officer.serviceLocationId)
 			.order('queue_number', { ascending: false })
 			.limit(1)
-			.single(); 
+			.single();
 
 		const newQueueNumber = (maxQueue?.queue_number || currentQueue.queue_number) + 3;
 
@@ -297,7 +304,6 @@
 			.eq('id', currentQueue.id);
 
 		if (!error) {
-
 			await fetch('http://localhost:3000/send-whatsapp', {
 				method: 'POST',
 				headers: {
@@ -308,7 +314,6 @@
 					message: `Your queue has been skipped.\nYour new queue number is ${newQueueNumber}.\nPlease be ready when your number is called again.`
 				})
 			});
-
 
 			currentQueue = null;
 			await loadDeskState();
@@ -337,7 +342,6 @@
 	}
 
 	async function updateAvgDuration() {
-		// Ambil 5 sesi terakhir yang sudah selesai
 		const { data: recentQueues } = await supabase
 			.from('queues')
 			.select('start_serving_at, finish_serving_at, service_type_id')
@@ -349,13 +353,24 @@
 
 		if (!recentQueues || recentQueues.length === 0) return;
 
-		// Hitung WMA:` bobot lebih besar untuk yang terbaru
+		// Hitung rata-rata sementara dulu
+		const durations = recentQueues.map(
+			(q) => (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000
+		);
+
+		const tempAvg = durations.reduce((a, b) => a + b, 0) / durations.length;
+
+		// Filter outlier — hapus durasi yang melebihi 2x rata-rata
+		const filtered = durations.filter((d) => d <= 2 * tempAvg);
+
+		if (filtered.length === 0) return;
+
+		// Hitung WMA dari data yang sudah difilter
 		const weights = [5, 4, 3, 2, 1];
 		let totalWeight = 0;
 		let weightedSum = 0;
 
-		recentQueues.forEach((q, i) => {
-			const duration = (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000;
+		filtered.forEach((duration, i) => {
 			const weight = weights[i] || 1;
 			weightedSum += duration * weight;
 			totalWeight += weight;
@@ -363,7 +378,6 @@
 
 		const newAvgDuration = Math.round(weightedSum / totalWeight);
 
-		// Update avg_duration di service_types
 		await supabase
 			.from('service_types')
 			.update({ avg_duration: newAvgDuration })
@@ -373,8 +387,6 @@
 	}
 
 	async function closeRegistration() {
-		console.log('serviceLocationId:', officer.serviceLocationId);
-
 		await supabase
 			.from('service_locations')
 			.update({ is_registration_open: false })
@@ -394,7 +406,7 @@
 	}
 
 	function logout() {
-		localStorage.removeItem('userSession');
+		localStorage.removeItem('officerSession');
 		window.location.href = '/login';
 	}
 </script>
@@ -414,14 +426,14 @@
 			<button class="outline" on:click={() => (showWalkInForm = !showWalkInForm)}>
 				{showWalkInForm ? 'Cancel Walk-in' : 'Add Walk-in'}
 			</button>
-			
+
 			{#if showWalkInForm}
 				<div class="walk-in-form">
 					<input bind:value={walkInNik} placeholder="NIK (16 digits)" />
 					<input bind:value={walkInWa} placeholder="WhatsApp Number" />
 					<select bind:value={walkInServiceType}>
 						<option value="" disabled selected>Select Service Type</option>
-						{#each serviceTypes as type}
+						{#each serviceTypes as type (type.id)}
 							<option value={type.id}>{type.name}</option>
 						{/each}
 					</select>
@@ -446,7 +458,11 @@
 
 					{#if currentQueue}
 						<div class="mini-card">
-							<strong>{currentQueue.clients?.name || currentQueue.clients?.email || 'Walk-in Client'}</strong><br />
+							<strong
+								>{currentQueue.clients?.name ||
+									currentQueue.clients?.email ||
+									'Walk-in Client'}</strong
+							><br />
 							{currentQueue.wa_number || '-'}
 						</div>
 					{/if}
@@ -468,7 +484,9 @@
 
 					{#if nextQueue}
 						<div class="mini-card">
-							<strong>{nextQueue.clients?.name || nextQueue.clients?.email || 'Walk-in Client'}</strong><br />
+							<strong
+								>{nextQueue.clients?.name || nextQueue.clients?.email || 'Walk-in Client'}</strong
+							><br />
 							{nextQueue.wa_number || '-'}
 						</div>
 					{/if}
@@ -495,7 +513,8 @@
 					<ol reversed>
 						{#each servedQueues as item (item.id)}
 							<li>
-								{item.queue_number} - {item.clients?.name || item.clients?.email || 'No Client'} - {item.wa_number || '-'}
+								{item.queue_number} - {item.clients?.name || item.clients?.email || 'No Client'} - {item.wa_number ||
+									'-'}
 								{#if item.status === 'skipped'}
 									(Skipped)
 								{/if}

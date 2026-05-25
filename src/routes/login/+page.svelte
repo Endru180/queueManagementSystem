@@ -1,55 +1,83 @@
 <script>
 	import { supabase } from '$lib/supabase.js';
+
 	let role = '';
-	let email = '';
+	let identifier = ''; // NIK untuk client, email untuk officer
 	let password = '';
 	let error = '';
 
 	async function login() {
 		error = '';
 
-		if (!role || !email || !password) {
-			error = 'Please select role, enter email, and password.';
+		if (!role || !identifier || !password) {
+			error = 'Please fill in all fields.';
 			return;
 		}
 
-		let tableName = role === 'officer' ? 'officers' : 'clients';
+		if (role === 'client') {
+			// Validasi NIK
+			if (identifier.length !== 16 || !/^\d+$/.test(identifier)) {
+				error = 'NIK must be 16 digits.';
+				return;
+			}
 
-		const { data, error: loginError } = await supabase
-			.from(tableName)
-			.select('*')
-			.eq('email', email)
-			.eq('password', password)
-			.single();
+			// Hash NIK
+			const encoder = new TextEncoder();
+			const data = encoder.encode(identifier);
+			const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+			const hashArray = Array.from(new Uint8Array(hashBuffer));
+			const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
-		console.log('table:', tableName);
-		console.log('email:', email);
-		console.log('data:', data);
-		console.log('error:', loginError);
+			const { data: userData, error: loginError } = await supabase
+				.from('clients')
+				.select('*')
+				.eq('nik_hash', nikHash)
+				.eq('password', password)
+				.single();
 
-		if (loginError || !data) {
-			error = 'Invalid email or password.';
-			return;
-		}
+			if (loginError || !userData) {
+				error = 'Invalid NIK or password.';
+				return;
+			}
 
-		localStorage.setItem(
-			'userSession',
-			JSON.stringify({
-				role,
-				id: data.id,
-				name: data.name,
-				email: data.email,
-				service_location_id: data.service_location_id || null
-			})
-		);
+			localStorage.setItem(
+				'userSession',
+				JSON.stringify({
+					role: 'client',
+					id: userData.id,
+					nikHash: nikHash,
+					wa_number: userData.wa_number || ''
+				})
+			);
 
-		if (role === 'officer') {
-			window.location.href = '/officer/desk';
-		} else {
 			window.location.href = '/';
+		} else {
+			const { data: officerData, error: loginError } = await supabase
+				.from('officers')
+				.select('*, service_locations(name)')
+				.eq('email', identifier)
+				.eq('password', password)
+				.single();
+
+			if (loginError || !officerData) {
+				error = 'Invalid email or password.';
+				return;
+			}
+
+			localStorage.setItem(
+				'officerSession',
+				JSON.stringify({
+					role: 'officer',
+					officerId: officerData.id,
+					name: officerData.name,
+					location: officerData.service_locations.name,
+					serviceLocationId: officerData.service_location_id
+				})
+			);
+
+			window.location.href = '/officer/desk';
 		}
 	}
-			
 </script>
 
 <main class="login-page">
@@ -62,7 +90,7 @@
 			<option value="officer">Officer</option>
 		</select>
 
-		<input bind:value={email} placeholder="Email" />
+		<input bind:value={identifier} placeholder={role == 'officer' ? 'Email' : 'NIK (16 digits)'} />
 		<input bind:value={password} type="password" placeholder="Password" />
 
 		{#if error}

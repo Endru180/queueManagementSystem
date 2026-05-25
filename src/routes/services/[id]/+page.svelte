@@ -12,7 +12,6 @@
 	let submitting = false;
 	let error = '';
 
-
 	function logout() {
 		localStorage.removeItem('userSession');
 		window.location.href = '/login';
@@ -63,7 +62,6 @@
 
 		const confirmed = confirm('Are you sure you want to take a queue?');
 		if (!confirmed) return;
-
 
 		submitting = true;
 
@@ -122,10 +120,6 @@
 				message: `Your queue number is ${newQueue.queue_number}`
 			})
 		});
-
-		const existingIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
-		existingIds.push(newQueue.id);
-		localStorage.setItem('myQueueIds', JSON.stringify(existingIds));
 		window.location.href = `/monitor?queueId=${newQueue.id}`;
 	}
 
@@ -148,14 +142,12 @@
 {:else if location}
 	<main>
 		<div class="topbar">
-			<button class="logout-btn" onclick={logout}>
-				Logout
-			</button>
+			<button class="logout-btn" onclick={logout}> Logout </button>
 		</div>
 
 		<div class="header">
 			<button class="back" onclick={() => window.history.back()}>←</button>
-			<span>Services</span>
+			<span>{location.name}</span>
 		</div>
 
 		<label for="nik">Enter your NIK</label>

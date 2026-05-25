@@ -15,9 +15,6 @@
 	let provinces = [];
 	let cities = [];
 	let subdistricts = [];
-	let checkNik = '';
-	let nikCheckError = '';
-
 
 	function logout() {
 		localStorage.removeItem('userSession');
@@ -51,7 +48,6 @@
 	let activeQueues = [];
 
 	onMount(async () => {
-
 		const raw = localStorage.getItem('userSession');
 		const session = raw ? JSON.parse(raw) : null;
 
@@ -60,26 +56,15 @@
 			return;
 		}
 
-		const gpsDone = localStorage.getItem('gpsDone');
-		if (!gpsDone) {
-			showGpsPrompt = true; 
-		} else if (gpsDone === 'denied') {
-			gpsDenied = true;
-		}
 		loadProvinces();
 
-		const queueIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
-		if (queueIds.length > 0) {
-			const { data } = await supabase
-				.from('queues')
-				.select('*, service_types(*, service_locations(name, latitude, longitude))')
-				.in('id', queueIds)
-				.eq('status', 'waiting');
-			activeQueues = data || [];
-		}
+		const { data } = await supabase
+			.from('queues')
+			.select('*, service_types(*, service_locations(name, latitude, longitude))')
+			.eq('client_id', session.id)
+			.eq('status', 'waiting');
+		activeQueues = data || [];
 	});
-
-	let gpsDenied = true;
 
 	let showToast = false;
 	let locationConfirmed = false;
@@ -147,41 +132,6 @@
 				Math.sin(dLng / 2);
 		return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	}
-
-	async function findQueueByNik() {
-		nikCheckError = '';
-
-		if (!checkNik || checkNik.length !== 16 || !/^\d+$/.test(checkNik)) {
-			nikCheckError = 'NIK must be 16 digits.';
-			return;
-		}
-
-		const encoder = new TextEncoder();
-		const data = encoder.encode(checkNik);
-		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-		const hashArray = Array.from(new Uint8Array(hashBuffer));
-		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-
-		const { data: found } = await supabase
-			.from('queues')
-			.select('id')
-			.eq('nik_hash', nikHash)
-			.eq('status', 'waiting')
-			.single();
-
-		if (!found) {
-			nikCheckError = 'No active queue found for this NIK.';
-			return;
-		}
-
-		const existingIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
-		if (!existingIds.includes(found.id)) {
-			existingIds.push(found.id);
-			localStorage.setItem('myQueueIds', JSON.stringify(existingIds));
-		}
-
-		window.location.href = `/monitor?queueId=${found.id}`;
-	}
 </script>
 
 <!-- Toast -->
@@ -196,12 +146,8 @@
 
 <!-- Main Content -->
 <main>
-
-
 	<div class="topbar">
-		<button class="logout-btn" onclick={logout}>
-			Logout
-		</button>
+		<button class="logout-btn" onclick={logout}> Logout </button>
 	</div>
 
 	<div class="manual-location">
@@ -240,37 +186,6 @@
 		<option value="Kelurahan">Kelurahan</option>
 	</select>
 
-	{#if gpsDenied}
-		<div class="manual-location">
-			<select onchange={onProvinceSelect}>
-				<option value="" disabled selected>Select Province</option>
-				{#each provinces as p (p.id)}
-					<option value={p.id}>{p.name}</option>
-				{/each}
-			</select>
-
-			<select onchange={onCitySelect}>
-				<option value="" disabled selected>Select City/Regency</option>
-				{#each cities as c (c.id)}
-					<option value={c.id}>{c.name}</option>
-				{/each}
-			</select>
-
-			<select onchange={onSubdistrictSelect}>
-				<option value="" disabled selected>Select Subdistrict</option>
-				{#each subdistricts as d (d.id)}
-					<option value={d.id}>{d.name}</option>
-				{/each}
-			</select>
-		</div>
-	{:else}
-		<div class="app-name">
-			<p>NamaAplikasinya.com</p>
-		</div>
-	{/if}
-	<div class="app-name">
-		<p>NamaAplikasinya.com</p>
-	</div>
 	{#if activeQueues.length > 0}
 		<h3>Your Active Queue</h3>
 		{#each activeQueues as q (q.id)}
@@ -298,16 +213,6 @@
 			⚠️ Distance is estimated based on subdistrict center, not your exact location.
 		</p>
 	{/if}
-	<div class="nik-check">
-		<p>Already have a queue? Enter your NIK:</p>
-		<div class="nik-input-row">
-			<input type="text" placeholder="Enter your NIK" bind:value={checkNik} maxlength="16" />
-			<button onclick={findQueueByNik}>Check</button>
-		</div>
-		{#if nikCheckError}
-			<p class="nik-error">{nikCheckError}</p>
-		{/if}
-	</div>
 </main>
 
 <style>
@@ -354,36 +259,6 @@
 
 	.queue-card p {
 		color: #555 !important;
-	}
-
-	.nik-check {
-		margin-top: 1.5rem;
-		padding: 1rem;
-		background: white;
-		border-radius: 16px;
-		box-shadow: 4px 4px 0px #00000022;
-	}
-
-	.nik-check p {
-		font-size: 0.9rem;
-		color: #555;
-		margin-bottom: 0.5rem;
-	}
-
-	.nik-input-row {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.nik-input-row input {
-		flex: 1;
-		margin-bottom: 0;
-	}
-
-	.nik-error {
-		color: red;
-		font-size: 0.85rem;
-		margin-top: 0.5rem;
 	}
 
 	.manual-location {
@@ -446,6 +321,4 @@
 	.logout-btn {
 		width: auto;
 	}
-
 </style>
-

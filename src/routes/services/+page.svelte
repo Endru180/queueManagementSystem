@@ -10,7 +10,7 @@
 	let loading = false;
 
 	function getDistance(lat1, lng1, lat2, lng2) {
-		const R = 6371; 
+		const R = 6371;
 		const dLat = ((lat2 - lat1) * Math.PI) / 180;
 		const dLng = ((lng2 - lng1) * Math.PI) / 180;
 		const a =
@@ -21,7 +21,7 @@
 				Math.sin(dLng / 2);
 		return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	}
-	
+
 	function logout() {
 		localStorage.removeItem('userSession');
 		window.location.href = '/login';
@@ -84,16 +84,13 @@
 </script>
 
 <main>
-
 	<div class="topbar">
-		<button class="logout-btn" onclick={logout}>
-			Logout
-		</button>
+		<button class="logout-btn" onclick={logout}> Logout </button>
 	</div>
 
 	<div class="header">
-			<button class="back" onclick={() => window.history.back()}>←</button>
-			<span>Services</span>
+		<button class="back" onclick={() => window.history.back()}>←</button>
+		<span>Services</span>
 	</div>
 
 	<select bind:value={category} onchange={() => fetchLocations()}>
@@ -206,5 +203,4 @@
 	.logout-btn {
 		width: auto;
 	}
-
 </style>
