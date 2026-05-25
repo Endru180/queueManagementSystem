@@ -20,8 +20,8 @@
 		if (myQueue) {
 			const { data: serving } = await supabase
 				.from('queues')
-				.select('queue_number')
-				.eq('service_type_id', myQueue.service_type_id)
+				.select('queue_number, service_types!inner(service_location_id)')
+				.eq('service_types.service_location_id', myQueue.service_types.service_location_id)
 				.eq('status', 'serving')
 				.order('queue_number', { ascending: false })
 				.limit(1)
@@ -60,7 +60,7 @@
 
 	$: estimasi = myQueue
 		? Math.max(0, myQueue.queue_number - (currentNumber ?? 0)) *
-			(myQueue.service_types?.avg_duration ?? 10) +
+				(myQueue.service_types?.avg_duration ?? 10) +
 			(myQueue.service_types?.delay_minutes ?? 0)
 		: null;
 
@@ -110,9 +110,7 @@
 		{/if}
 
 		{#if myQueue?.service_types?.delay_minutes > 0}
-    		<div class="delay-alert">
-				Sorry, the officer is handling a case that requires more time.
-    		</div>
+			<div class="delay-alert">Sorry, the officer is handling a case that requires more time.</div>
 		{/if}
 
 		{#if isNearby}
@@ -185,12 +183,12 @@
 	}
 
 	.delay-alert {
-    	background: #ff9800;
-    	color: white;
-    	border-radius: 8px;
-    	padding: 0.8rem 1rem;
-    	text-align: center;
-    	font-size: 0.9rem;
+		background: #ff9800;
+		color: white;
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		text-align: center;
+		font-size: 0.9rem;
 	}
 
 	.actions {
