@@ -51,7 +51,6 @@
 	let activeQueues = [];
 
 	onMount(async () => {
-<<<<<<< HEAD
 
 		const raw = localStorage.getItem('userSession');
 		const session = raw ? JSON.parse(raw) : null;
@@ -67,8 +66,6 @@
 		} else if (gpsDone === 'denied') {
 			gpsDenied = true;
 		}
-=======
->>>>>>> 8bcf28741f982f39e96350f566bf223141606f5b
 		loadProvinces();
 
 		const queueIds = JSON.parse(localStorage.getItem('myQueueIds') || '[]');
@@ -82,10 +79,8 @@
 		}
 	});
 
-<<<<<<< HEAD
 	let gpsDenied = true;
-=======
->>>>>>> 8bcf28741f982f39e96350f566bf223141606f5b
+
 	let showToast = false;
 	let locationConfirmed = false;
 	$: locationReady = locationConfirmed;
@@ -201,7 +196,7 @@
 
 <!-- Main Content -->
 <main>
-<<<<<<< HEAD
+
 
 	<div class="topbar">
 		<button class="logout-btn" onclick={logout}>
@@ -209,7 +204,6 @@
 		</button>
 	</div>
 
-=======
 	<div class="manual-location">
 		<select onchange={onProvinceSelect}>
 			<option value="" disabled selected>Select Province</option>
@@ -232,7 +226,6 @@
 			{/each}
 		</select>
 	</div>
->>>>>>> 8bcf28741f982f39e96350f566bf223141606f5b
 	<select
 		disabled={!locationReady}
 		onchange={(e) => {
@@ -246,9 +239,6 @@
 		<option value="Bank">Bank</option>
 		<option value="Kelurahan">Kelurahan</option>
 	</select>
-<<<<<<< HEAD
-
-	
 
 	{#if gpsDenied}
 		<div class="manual-location">
@@ -278,11 +268,9 @@
 			<p>NamaAplikasinya.com</p>
 		</div>
 	{/if}
-=======
 	<div class="app-name">
 		<p>NamaAplikasinya.com</p>
 	</div>
->>>>>>> 8bcf28741f982f39e96350f566bf223141606f5b
 	{#if activeQueues.length > 0}
 		<h3>Your Active Queue</h3>
 		{#each activeQueues as q (q.id)}
@@ -448,7 +436,6 @@
 		margin-bottom: 0.5rem;
 		color: black;
 	}
-<<<<<<< HEAD
 
 	.topbar {
 		display: flex;
@@ -461,6 +448,4 @@
 	}
 
 </style>
-=======
-</style>
->>>>>>> 8bcf28741f982f39e96350f566bf223141606f5b
+
