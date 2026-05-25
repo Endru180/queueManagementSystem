@@ -64,10 +64,13 @@
 	}
 
 	async function notifyUpcomingQueues() {
+		const ids = await getServiceTypeIds();
+
 		const { data: upcomingQueues } = await supabase
 			.from('queues')
 			.select('*')
 			.eq('status', 'waiting')
+			.in('service_type_id', ids)
 			.order('queue_number', { ascending: true })
 			.limit(3);
 
@@ -79,12 +82,10 @@
 
 			await fetch('http://localhost:3000/send-whatsapp', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					target: queue.wa_number,
-					message: `Queue Update: Your Queue ${queue.queue_number}. Estimasi Waiting Time: ${estimatedWait} minutes.`
+					message: `Queue Update: Your Queue ${queue.queue_number}. Estimated Waiting Time: ${estimatedWait} minutes.`
 				})
 			});
 		}
@@ -286,7 +287,7 @@
 		const { data: maxQueue } = await supabase
 			.from('queues')
 			.select('queue_number')
-			.eq('service_location_id', officer.serviceLocationId)
+			.in('service_type_id', await getServiceTypeIds())
 			.order('queue_number', { ascending: false })
 			.limit(1)
 			.single();
@@ -405,6 +406,15 @@
 		registrationOpen = true;
 	}
 
+	async function hardCase() {
+		const confirmed = confirm('Add 15 minutes buffer for all waiting queues?');
+		if (!confirmed) return;
+
+		const ids = await getServiceTypeIds();
+
+		await supabase.from('service_types').update({ delay_minutes: 15 }).in('id', ids);
+	}
+
 	function logout() {
 		localStorage.removeItem('officerSession');
 		window.location.href = '/login';
@@ -417,7 +427,7 @@
 	<main class="page">
 		<header class="topbar">
 			<div>
-				<strong>{officer?.name}</strong> - {officer?.officerId} - {officer?.location}
+				<strong>{officer?.name}</strong> - {officer?.location}
 			</div>
 			<button class="icon-btn secondary" on:click={logout}>Logout</button>
 		</header>
@@ -501,6 +511,9 @@
 				</div>
 
 				<div class="close-box">
+					{#if currentQueue}
+						<button class="outline warning" on:click={hardCase}> Hard Case </button>
+					{/if}
 					<button class="outline danger" on:click={() => (showCloseConfirm = true)}>
 						Close Registration
 					</button>
@@ -704,10 +717,6 @@
 
 	.outline {
 		width: 100%;
-		margin-bottom: 1rem;
-	}
-
-	.outline {
 		background: white;
 		border: 1px solid #cfcfcf;
 		border-radius: 12px;
@@ -734,5 +743,10 @@
 	.reopen-btn {
 		margin-top: 1rem;
 		width: 100%;
+	}
+
+	.warning {
+		color: #ff9800;
+		border-color: #ff9800;
 	}
 </style>
