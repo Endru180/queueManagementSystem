@@ -65,11 +65,20 @@
 
 		submitting = true;
 
+		const raw = localStorage.getItem('userSession');
+		const session = raw ? JSON.parse(raw) : null;
+
 		const encoder = new TextEncoder();
 		const data = encoder.encode(nik);
 		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 		const hashArray = Array.from(new Uint8Array(hashBuffer));
 		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
+		if (nikHash !== session.nikHash) {
+			error = 'NIK must match with your registered NIK.';
+			submitting = false;
+			return;
+		}
 
 		// Cek apakah NIK sudah ada di antrian hari ini
 		const { data: existing } = await supabase
@@ -90,8 +99,6 @@
 		});
 
 		const queueNumber = queueData;
-		const raw = localStorage.getItem('userSession');
-		const session = raw ? JSON.parse(raw) : null;
 		const { data: newQueue, error: insertError } = await supabase
 			.from('queues')
 			.insert({
@@ -193,6 +200,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.8rem;
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	.header {

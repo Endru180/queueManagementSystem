@@ -34,23 +34,31 @@
 	}
 
 	function subscribeRealtime(queueId) {
-    	subscription = supabase
-        	.channel('queue-monitor')
-        	.on('postgres_changes', {
-            	event: '*',
-            	schema: 'public',
-            	table: 'queues'
-        	}, () => {
-            	fetchQueueData(queueId);
-        	})
-        	.on('postgres_changes', {
-            	event: 'UPDATE',
-            	schema: 'public',
-            	table: 'service_types'
-        	}, () => {
-            	fetchQueueData(queueId);
-        	})
-        	.subscribe();
+		subscription = supabase
+			.channel('queue-monitor')
+			.on(
+				'postgres_changes',
+				{
+					event: '*',
+					schema: 'public',
+					table: 'queues'
+				},
+				() => {
+					fetchQueueData(queueId);
+				}
+			)
+			.on(
+				'postgres_changes',
+				{
+					event: 'UPDATE',
+					schema: 'public',
+					table: 'service_types'
+				},
+				() => {
+					fetchQueueData(queueId);
+				}
+			)
+			.subscribe();
 	}
 
 	async function cancelQueue() {
@@ -137,6 +145,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	.numbers {
@@ -161,11 +170,13 @@
 		font-weight: bold;
 		font-size: 0.9rem;
 		text-align: center;
+		color: black;
 	}
 
 	.number {
 		font-size: 3rem;
 		font-weight: bold;
+		color: black;
 	}
 
 	.estimation {
@@ -175,6 +186,7 @@
 		padding: 0.8rem 1rem;
 		font-style: italic;
 		text-align: center;
+		color: black;
 	}
 
 	.warning {

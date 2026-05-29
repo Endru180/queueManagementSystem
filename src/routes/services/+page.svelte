@@ -90,7 +90,7 @@
 
 	<div class="header">
 		<button class="back" onclick={() => window.history.back()}>←</button>
-		<span>{category || 'Services'}</span>
+		<span class="category">{category || 'Services'}</span>
 	</div>
 
 	<select bind:value={category} onchange={() => fetchLocations()}>
@@ -125,6 +125,7 @@
 		min-height: 100vh;
 		padding: 1rem;
 		background: linear-gradient(to bottom, #d0d0d0, #f5f5f5);
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	select {
@@ -138,6 +139,7 @@
 		padding: 1rem 1.2rem;
 		margin-bottom: 1rem;
 		box-shadow: 4px 4px 0px #00000022;
+		border: 1.5px solid #cfcfcf !important;
 		cursor: pointer;
 		width: 100%;
 		text-align: left;
@@ -192,6 +194,10 @@
 		align-items: center;
 		justify-content: center;
 		padding-top: 11px;
+	}
+
+	.category {
+		color: black;
 	}
 
 	.topbar {

@@ -210,7 +210,7 @@
 			</button>
 		{/each}
 		<p class="disclaimer">
-			⚠️ Distance is estimated based on subdistrict center, not your exact location.
+			⚠️ <i>Distance is estimated based on subdistrict center, not your exact location.</i>
 		</p>
 	{/if}
 </main>
@@ -218,8 +218,9 @@
 <style>
 	main {
 		min-height: 100vh;
-		padding: 1rem;
+		padding: 1rem 1.5rem 0.1rem 1.5rem;
 		background: linear-gradient(to bottom, #d0d0d0, #f5f5f5);
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	select {
@@ -233,6 +234,7 @@
 		padding: 1rem 1.2rem;
 		margin-bottom: 1rem;
 		box-shadow: 4px 4px 0px #00000022;
+		border: 1.5px solid #cfcfcf !important;
 		cursor: pointer;
 		width: 100%;
 		text-align: left;
@@ -290,6 +292,7 @@
 		flex-direction: column;
 		gap: 0.5rem;
 		min-width: 260px;
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	.toast p {
@@ -310,6 +313,7 @@
 		font-weight: bold;
 		margin-bottom: 0.5rem;
 		color: black;
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	.topbar {

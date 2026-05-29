@@ -86,14 +86,18 @@
 			const queue = upcomingQueues[i];
 			const estimatedWait = averageMinutes * (i + 1);
 
-			await fetch('http://localhost:3000/send-whatsapp', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					target: queue.wa_number,
-					message: `Queue Update: Your Queue ${queue.queue_number}. Estimated Waiting Time: ${estimatedWait} minutes.`
-				})
-			});
+			try {
+				await fetch('http://localhost:3000/send-whatsapp', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						target: queue.wa_number,
+						message: `Queue Update: Your Queue ${queue.queue_number}. Estimated Waiting Time: ${estimatedWait} minutes.`
+					})
+				});
+			} catch (e) {
+				console.warn('WhatsApp server not available:', e);
+			}
 		}
 	}
 
@@ -150,14 +154,18 @@
 			return;
 		}
 
-		await fetch('http://localhost:3000/send-whatsapp', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				target: newQueue.wa_number,
-				message: `Your queue number is ${newQueue.queue_number}`
-			})
-		});
+		try {
+			await fetch('http://localhost:3000/send-whatsapp', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					target: newQueue.wa_number,
+					message: `Your queue number is ${newQueue.queue_number}`
+				})
+			});
+		} catch (e) {
+			console.warn('WhatsApp server not available:', e);
+		}
 
 		walkInNik = '';
 		walkInWa = '';
@@ -192,7 +200,7 @@
 		// Current serving
 		const { data: servingData } = await supabase
 			.from('queues')
-			.select('*, clients(name, email)')
+			.select('*')
 			.eq('status', 'serving')
 			.in('service_type_id', ids)
 			.order('start_serving_at', { ascending: true })
@@ -203,7 +211,7 @@
 		// Next waiting
 		const { data: nextData } = await supabase
 			.from('queues')
-			.select('*, clients(name, email)')
+			.select('*')
 			.eq('status', 'waiting')
 			.in('service_type_id', ids)
 			.order('queue_number', { ascending: true })
@@ -214,10 +222,10 @@
 		// Recently served
 		const { data: servedData } = await supabase
 			.from('queues')
-			.select('*, clients(name, email)')
+			.select('*')
 			.in('status', ['served', 'skipped'])
 			.in('service_type_id', ids)
-			.order('finish_serving_at', { ascending: false })
+			.order('finish_serving_at', { ascending: true })
 			.limit(10);
 
 		servedQueues = servedData || [];
@@ -262,16 +270,20 @@
 		const newSkipCount = (currentQueue.skip_count || 0) + 1;
 
 		if (newSkipCount >= 3) {
-			await fetch('http://localhost:3000/send-whatsapp', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					target: currentQueue.wa_number,
-					message: `Your Queue number has been skipped 3 times and removed from the queue. Please register again if you still want to be served.`
-				})
-			});
+			try {
+				await fetch('http://localhost:3000/send-whatsapp', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						target: currentQueue.wa_number,
+						message: `Your Queue number has been skipped 3 times and removed from the queue. Please register again if you still want to be served.`
+					})
+				});
+			} catch (e) {
+				console.warn('WhatsApp server not available:', e);
+			}
 
 			const { error } = await supabase
 				.from('queues')
@@ -311,16 +323,20 @@
 			.eq('id', currentQueue.id);
 
 		if (!error) {
-			await fetch('http://localhost:3000/send-whatsapp', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					target: currentQueue.wa_number,
-					message: `Your queue has been skipped.\nYour new queue number is ${newQueueNumber}.\nPlease be ready when your number is called again.`
-				})
-			});
+			try {
+				await fetch('http://localhost:3000/send-whatsapp', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						target: currentQueue.wa_number,
+						message: `Your queue has been skipped.\nYour new queue number is ${newQueueNumber}.\nPlease be ready when your number is called again.`
+					})
+				});
+			} catch (e) {
+				console.warn('WhatsApp server not available:', e);
+			}
 
 			currentQueue = null;
 			await loadDeskState();
@@ -478,12 +494,7 @@
 
 					{#if currentQueue}
 						<div class="mini-card">
-							<strong
-								>{currentQueue.clients?.name ||
-									currentQueue.clients?.email ||
-									'Walk-in Client'}</strong
-							><br />
-							{currentQueue.wa_number || '-'}
+							<strong>{currentQueue?.wa_number || 'Walk-in Client'}</strong><br />
 						</div>
 					{/if}
 
@@ -504,10 +515,7 @@
 
 					{#if nextQueue}
 						<div class="mini-card">
-							<strong
-								>{nextQueue.clients?.name || nextQueue.clients?.email || 'Walk-in Client'}</strong
-							><br />
-							{nextQueue.wa_number || '-'}
+							<strong>{nextQueue?.wa_number || 'Walk-in Client'}</strong><br />
 						</div>
 					{/if}
 
@@ -522,7 +530,7 @@
 
 				<div class="close-box">
 					{#if currentQueue}
-						<button class="outline warning" onclick={hardCase}> Hard Case </button>
+						<button class="outline warning" onclick={hardCase}>Hard Case</button>
 					{/if}
 					<button class="outline danger" onclick={() => (showCloseConfirm = true)}>
 						Close Registration
@@ -533,11 +541,10 @@
 			<section class="bottom-grid">
 				<article class="served-list">
 					<h6>Client Served:</h6>
-					<ol reversed>
+					<ol>
 						{#each servedQueues as item (item.id)}
 							<li>
-								{item.queue_number} - {item.clients?.name || item.clients?.email || 'No Client'} - {item.wa_number ||
-									'-'}
+								{item.queue_number} - {item?.wa_number || 'Walk-in Client'}
 								{#if item.status === 'skipped'}
 									(Skipped)
 								{/if}
@@ -582,6 +589,7 @@
 		padding: 1rem;
 		background: linear-gradient(to bottom, #d7d7d7, #f4f4f4);
 		color: #222;
+		font-family: Arial, Helvetica, sans-serif;
 	}
 
 	.topbar {
@@ -597,6 +605,10 @@
 		grid-template-columns: 1fr 1fr;
 		gap: 1rem;
 		align-items: start;
+	}
+
+	.walk-in-form {
+		margin-bottom: 20px;
 	}
 
 	.queue-box {
@@ -661,6 +673,7 @@
 		grid-column: 1 / -1;
 		display: flex;
 		justify-content: flex-end;
+		gap: 1rem;
 	}
 
 	.bottom-grid {
@@ -677,6 +690,8 @@
 		border: 1px solid #cfcfcf;
 		border-radius: 12px;
 		padding: 1rem;
+		font-family: Arial, Helvetica, sans-serif !important;
+		color: black;
 	}
 
 	.served-list ol {
@@ -737,6 +752,7 @@
 	.error {
 		color: red;
 		font-size: 0.85rem;
+		margin-top: 16px;
 	}
 
 	@media (max-width: 768px) {

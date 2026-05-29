@@ -81,7 +81,8 @@
 
 <main class="login-page">
 	<article class="login-card">
-		<h2>Login</h2>
+		<h3>Local Queue Management System (LQMS)</h3>
+		<h4>Login</h4>
 
 		<select bind:value={role}>
 			<option value="" disabled selected>Select Profile</option>
@@ -115,6 +116,14 @@
 		background: white;
 		border-radius: 16px;
 		padding: 1.5rem;
+		font-family: Arial, Helvetica, sans-serif !important;
+		font-size: 2px;
+	}
+
+	.login-card h3,
+	h4 {
+		color: black;
+		font-family: Arial, Helvetica, sans-serif !important;
 	}
 
 	.error {
