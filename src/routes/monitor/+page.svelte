@@ -34,20 +34,23 @@
 	}
 
 	function subscribeRealtime(queueId) {
-		subscription = supabase
-			.channel('queue-monitor')
-			.on(
-				'postgres_changes',
-				{
-					event: '*',
-					schema: 'public',
-					table: 'queues'
-				},
-				() => {
-					fetchQueueData(queueId);
-				}
-			)
-			.subscribe();
+    	subscription = supabase
+        	.channel('queue-monitor')
+        	.on('postgres_changes', {
+            	event: '*',
+            	schema: 'public',
+            	table: 'queues'
+        	}, () => {
+            	fetchQueueData(queueId);
+        	})
+        	.on('postgres_changes', {
+            	event: 'UPDATE',
+            	schema: 'public',
+            	table: 'service_types'
+        	}, () => {
+            	fetchQueueData(queueId);
+        	})
+        	.subscribe();
 	}
 
 	async function cancelQueue() {
