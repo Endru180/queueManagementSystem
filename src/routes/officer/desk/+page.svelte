@@ -276,7 +276,7 @@
 			const { error } = await supabase
 				.from('queues')
 				.update({
-					status: 'skipped',
+					status: 'forfeited',
 					skip_count: newSkipCount,
 					finish_serving_at: now
 				})
