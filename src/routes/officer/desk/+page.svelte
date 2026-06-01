@@ -61,7 +61,7 @@
 		let weightTotal = 0;
 
 		latest.forEach((duration, index) => {
-			const weight = index + 1;
+			const weight = latest.length - index;
 			weightedTotal += duration * weight;
 			weightTotal += weight;
 		});
@@ -229,7 +229,17 @@
 			.limit(10);
 
 		servedQueues = servedData || [];
-		averageMinutes = calculateWMA(servedQueues);
+
+		// Query terpisah untuk WMA (descending — terbaru duluan)
+		const { data: wmaData } = await supabase
+			.from('queues')
+			.select('*')
+			.in('status', ['served', 'skipped'])
+			.in('service_type_id', ids)
+			.order('finish_serving_at', { ascending: false })
+			.limit(5);
+
+		averageMinutes = calculateWMA(wmaData || []);
 
 		loading = false;
 	}
