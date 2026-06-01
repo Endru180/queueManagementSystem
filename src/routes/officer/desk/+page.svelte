@@ -61,7 +61,7 @@
 		let weightTotal = 0;
 
 		latest.forEach((duration, index) => {
-			const weight = latest.length - index;
+			const weight = index + 1;
 			weightedTotal += duration * weight;
 			weightTotal += weight;
 		});
@@ -262,22 +262,19 @@
 		}
 	}
 
-	async function skipCurrent() {
-		if (!currentQueue) return;
+	async function skipNext() {
+		if (!nextQueue) return;
 
 		const now = new Date().toISOString();
-
-		const newSkipCount = (currentQueue.skip_count || 0) + 1;
+		const newSkipCount = (nextQueue.skip_count || 0) + 1;
 
 		if (newSkipCount >= 3) {
 			try {
 				await fetch('http://localhost:3000/send-whatsapp', {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
+					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						target: currentQueue.wa_number,
+						target: nextQueue.wa_number,
 						message: `Your Queue number has been skipped 3 times and removed from the queue. Please register again if you still want to be served.`
 					})
 				});
@@ -285,62 +282,46 @@
 				console.warn('WhatsApp server not available:', e);
 			}
 
-			const { error } = await supabase
+			await supabase
+				.from('queues')
+				.update({ status: 'forfeited', skip_count: newSkipCount, finish_serving_at: now })
+				.eq('id', nextQueue.id);
+		} else {
+			const { data: maxQueue } = await supabase
+				.from('queues')
+				.select('queue_number')
+				.in('service_type_id', await getServiceTypeIds())
+				.order('queue_number', { ascending: false })
+				.limit(1)
+				.single();
+
+			const newQueueNumber = (maxQueue?.queue_number || nextQueue.queue_number) + 3;
+
+			await supabase
 				.from('queues')
 				.update({
-					status: 'forfeited',
+					status: 'waiting',
+					queue_number: newQueueNumber,
 					skip_count: newSkipCount,
 					finish_serving_at: now
 				})
-				.eq('id', currentQueue.id);
+				.eq('id', nextQueue.id);
 
-			if (!error) {
-				currentQueue = null;
-				await loadDeskState();
-			}
-
-			return;
-		}
-
-		const { data: maxQueue } = await supabase
-			.from('queues')
-			.select('queue_number')
-			.in('service_type_id', await getServiceTypeIds())
-			.order('queue_number', { ascending: false })
-			.limit(1)
-			.single();
-
-		const newQueueNumber = (maxQueue?.queue_number || currentQueue.queue_number) + 3;
-
-		const { error } = await supabase
-			.from('queues')
-			.update({
-				status: 'waiting',
-				queue_number: newQueueNumber,
-				skip_count: newSkipCount,
-				finish_serving_at: now
-			})
-			.eq('id', currentQueue.id);
-
-		if (!error) {
 			try {
 				await fetch('http://localhost:3000/send-whatsapp', {
 					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
+					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						target: currentQueue.wa_number,
+						target: nextQueue.wa_number,
 						message: `Your queue has been skipped.\nYour new queue number is ${newQueueNumber}.\nPlease be ready when your number is called again.`
 					})
 				});
 			} catch (e) {
 				console.warn('WhatsApp server not available:', e);
 			}
-
-			currentQueue = null;
-			await loadDeskState();
 		}
+
+		await loadDeskState();
 	}
 
 	async function finishCurrent() {
@@ -521,10 +502,7 @@
 
 					{#if !currentQueue && nextQueue}
 						<button class="serve-btn" onclick={serveNext}>Serve</button>
-					{/if}
-
-					{#if currentQueue}
-						<button class="skip-btn" onclick={skipCurrent}>Skip</button>
+						<button class="skip-btn" onclick={skipNext}>Skip</button>
 					{/if}
 				</div>
 

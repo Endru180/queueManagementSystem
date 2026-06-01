@@ -75,7 +75,7 @@
 			(myQueue.service_types?.delay_minutes ?? 0)
 		: null;
 
-	$: isNearby = myQueue && myQueue.queue_number - (currentNumber ?? 0) <= 3;
+	$: isNearby = myQueue && currentNumber !== null && myQueue.queue_number - currentNumber <= 3;
 
 	onMount(() => {
 		const raw = localStorage.getItem('userSession');
@@ -102,39 +102,59 @@
 		<p>Loading...</p>
 	</main>
 {:else if myQueue}
-	<main>
-		<div class="numbers">
-			<div class="number-box">
-				<span class="label">Current Number</span>
-				<span class="number">{currentNumber ?? '-'}</span>
+	{#if myQueue.status === 'forfeited'}
+		<main>
+			<div class="forfeited-card">
+				<h2>❌ Queue Forfeited</h2>
+				<p>
+					Your queue has been skipped 3 times and removed. Please register again if you still want
+					to be served.
+				</p>
+				<button onclick={() => (window.location.href = '/')}>Back to Home</button>
 			</div>
-			<div class="number-box">
-				<span class="label">Your Number</span>
-				<span class="number">{myQueue.queue_number}</span>
+		</main>
+	{:else}
+		<main>
+			{#if myQueue.status === 'serving'}
+				<div class="serving-alert">
+					🎉 It's your turn! Please proceed to the service counter now.
+				</div>
+			{/if}
+			<div class="numbers">
+				<div class="number-box">
+					<span class="label">Current Number</span>
+					<span class="number">{currentNumber ?? '-'}</span>
+				</div>
+				<div class="number-box">
+					<span class="label">Your Number</span>
+					<span class="number">{myQueue.queue_number}</span>
+				</div>
 			</div>
-		</div>
 
-		{#if estimasi !== null}
-			<div class="estimation">
-				Estimation: <strong>{estimasi} minutes again.</strong>
+			{#if estimasi !== null}
+				<div class="estimation">
+					Estimation: <strong>{estimasi} minutes again.</strong>
+				</div>
+			{/if}
+
+			{#if myQueue?.service_types?.delay_minutes > 0}
+				<div class="delay-alert">
+					Sorry, the officer is handling a case that requires more time.
+				</div>
+			{/if}
+
+			{#if isNearby && myQueue.status !== 'serving'}
+				<div class="warning">
+					<strong>WARNING</strong>: Stay Alert over the current number
+				</div>
+			{/if}
+
+			<div class="actions">
+				<button class="cancel" onclick={cancelQueue}>Cancel the Queue</button>
+				<button class="back" onclick={() => (window.location.href = '/')}>Back</button>
 			</div>
-		{/if}
-
-		{#if myQueue?.service_types?.delay_minutes > 0}
-			<div class="delay-alert">Sorry, the officer is handling a case that requires more time.</div>
-		{/if}
-
-		{#if isNearby}
-			<div class="warning">
-				<strong>WARNING</strong>: Stay Alert over the current number
-			</div>
-		{/if}
-
-		<div class="actions">
-			<button class="cancel" onclick={cancelQueue}>Cancel the Queue</button>
-			<button class="back" onclick={() => (window.location.href = '/')}>Back</button>
-		</div>
-	</main>
+		</main>
+	{/if}
 {/if}
 
 <style>
@@ -234,5 +254,29 @@
 		border-radius: 16px;
 		font-size: 1rem;
 		cursor: pointer;
+	}
+
+	.forfeited-card {
+		background: white;
+		border-radius: 16px;
+		padding: 2rem;
+		text-align: center;
+		margin-top: 2rem;
+		border: 2px solid #e53935;
+	}
+
+	.forfeited-card h2 {
+		color: #e53935;
+		margin-bottom: 1rem;
+	}
+
+	.serving-alert {
+		background: #1f9d55;
+		color: white;
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		text-align: center;
+		font-weight: bold;
+		font-size: 1rem;
 	}
 </style>

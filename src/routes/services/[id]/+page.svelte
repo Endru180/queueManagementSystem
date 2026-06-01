@@ -117,16 +117,20 @@
 			return;
 		}
 
-		await fetch('http://localhost:3000/send-whatsapp', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				target: newQueue.wa_number,
-				message: `Your queue number is ${newQueue.queue_number}`
-			})
-		});
+		try {
+			await fetch('http://localhost:3000/send-whatsapp', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					target: newQueue.wa_number,
+					message: `Your queue number is ${newQueue.queue_number}`
+				})
+			});
+		} catch (e) {
+			console.warn('WhatsApp server not available:', e);
+		}
 		window.location.href = `/monitor?queueId=${newQueue.id}`;
 	}
 
@@ -178,7 +182,11 @@
 			<p class="error">{error}</p>
 		{/if}
 
-		<button class="take-queue" onclick={takeQueue} disabled={submitting}>
+		<button
+			class="take-queue"
+			onclick={takeQueue}
+			disabled={submitting || !location.is_registration_open}
+		>
 			{submitting ? 'Processing...' : 'Take Queue'}
 		</button>
 	</main>
