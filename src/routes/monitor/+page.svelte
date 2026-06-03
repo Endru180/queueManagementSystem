@@ -8,6 +8,11 @@
 	let loading = true;
 	let subscription = null;
 
+	let countdown = null;
+	let countdownInterval = null;
+	let countdownCancelled = false;
+	let countdownReason = null;
+
 	async function fetchQueueData(queueId) {
 		const { data: myData } = await supabase
 			.from('queues')
@@ -33,30 +38,38 @@
 		loading = false;
 	}
 
+	function startCountdown() {
+		if (countdownInterval) return;
+		countdown = 30;
+		countdownInterval = setInterval(() => {
+			countdown--;
+			if (countdown <= 0) {
+				clearInterval(countdownInterval);
+				countdownInterval = null;
+				window.location.href = '/';
+			}
+		}, 1000);
+	}
+
+	function cancelCountdown() {
+		countdownCancelled = true;
+		clearInterval(countdownInterval);
+		countdownInterval = null;
+		countdown = null;
+	}
+
 	function subscribeRealtime(queueId) {
 		subscription = supabase
 			.channel('queue-monitor')
 			.on(
 				'postgres_changes',
-				{
-					event: '*',
-					schema: 'public',
-					table: 'queues'
-				},
-				() => {
-					fetchQueueData(queueId);
-				}
+				{ event: '*', schema: 'public', table: 'queues' },
+				() => { fetchQueueData(queueId); }
 			)
 			.on(
 				'postgres_changes',
-				{
-					event: 'UPDATE',
-					schema: 'public',
-					table: 'service_types'
-				},
-				() => {
-					fetchQueueData(queueId);
-				}
+				{ event: 'UPDATE', schema: 'public', table: 'service_types' },
+				() => { fetchQueueData(queueId); }
 			)
 			.subscribe();
 	}
@@ -69,13 +82,39 @@
 		window.location.href = '/';
 	}
 
-	$: estimasi = myQueue
-		? Math.max(0, myQueue.queue_number - (currentNumber ?? 0)) *
-				(myQueue.service_types?.avg_duration ?? 10) +
-			(myQueue.service_types?.delay_minutes ?? 0)
-		: null;
+	$: isPassed =
+		myQueue &&
+		currentNumber !== null &&
+		currentNumber > myQueue.queue_number &&
+		myQueue.status !== 'serving' &&
+		myQueue.status !== 'served';
 
-	$: isNearby = myQueue && currentNumber !== null && myQueue.queue_number - currentNumber <= 3;
+	$: isNearby =
+		myQueue &&
+		currentNumber !== null &&
+		myQueue.queue_number - currentNumber <= 3 &&
+		myQueue.queue_number >= currentNumber &&
+		myQueue.status !== 'serving';
+
+	$: estimasi =
+		myQueue && !isPassed
+			? Math.max(0, myQueue.queue_number - (currentNumber ?? 0)) *
+					(myQueue.service_types?.avg_duration ?? 10) +
+				(myQueue.service_types?.delay_minutes ?? 0)
+			: null;
+
+	$: {
+		const reason = myQueue?.status === 'serving' ? 'serving' : isPassed ? 'passed' : null;
+		if (reason !== countdownReason) {
+			countdownReason = reason;
+			if (reason !== null) {
+				countdownCancelled = false;
+				if (!countdownInterval) startCountdown();
+			}
+		} else if (reason && !countdownCancelled && !countdownInterval) {
+			startCountdown();
+		}
+	}
 
 	onMount(() => {
 		const raw = localStorage.getItem('userSession');
@@ -94,6 +133,7 @@
 
 	onDestroy(() => {
 		if (subscription) subscription.unsubscribe();
+		if (countdownInterval) clearInterval(countdownInterval);
 	});
 </script>
 
@@ -113,13 +153,40 @@
 				<button onclick={() => (window.location.href = '/')}>Back to Home</button>
 			</div>
 		</main>
+	{:else if myQueue.status === 'served'}
+		<main>
+			<div class="done-card">
+				<h2>✅ You've Been Served!</h2>
+				<p>Thank you for your patience. We hope to see you again.</p>
+				<button onclick={() => (window.location.href = '/')}>Back to Home</button>
+			</div>
+		</main>
 	{:else}
 		<main>
 			{#if myQueue.status === 'serving'}
 				<div class="serving-alert">
-					🎉 It's your turn! Please proceed to the service counter now.
+					<span>🎉 It's your turn! Please proceed to the service counter now.</span>
+					{#if countdown !== null}
+						<div class="countdown-row">
+							<span class="countdown-text">Redirecting to home in {countdown}s...</span>
+							<button class="stay-btn" onclick={cancelCountdown}>Stay</button>
+						</div>
+					{/if}
 				</div>
 			{/if}
+
+			{#if isPassed}
+				<div class="passed-alert">
+					<span>⚠️ Your number has already passed. You may have been skipped or already served.</span>
+					{#if countdown !== null}
+						<div class="countdown-row">
+							<span class="countdown-text">Redirecting to home in {countdown}s...</span>
+							<button class="stay-btn" onclick={cancelCountdown}>Stay</button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="numbers">
 				<div class="number-box">
 					<span class="label">Current Number</span>
@@ -131,7 +198,13 @@
 				</div>
 			</div>
 
-			{#if estimasi !== null}
+			{#if myQueue.status === 'serving'}
+				<!-- estimation hidden: it's your turn -->
+			{:else if currentNumber === null}
+				<div class="estimation">
+					The service has not started yet.
+				</div>
+			{:else if estimasi !== null}
 				<div class="estimation">
 					Estimation: <strong>{estimasi} minutes again.</strong>
 				</div>
@@ -226,6 +299,61 @@
 		font-size: 0.9rem;
 	}
 
+	.serving-alert {
+		background: #1f9d55;
+		color: white;
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		text-align: center;
+		font-weight: bold;
+		font-size: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.passed-alert {
+		background: #f57c00;
+		color: white;
+		border-radius: 8px;
+		padding: 0.8rem 1rem;
+		text-align: center;
+		font-weight: bold;
+		font-size: 0.95rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.countdown-row {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+	}
+
+	.countdown-text {
+		font-size: 0.85rem;
+		font-weight: normal;
+		opacity: 0.9;
+	}
+
+	.stay-btn {
+		background: white;
+		border: none;
+		border-radius: 6px;
+		padding: 0.2rem 0.75rem;
+		font-size: 0.8rem;
+		font-weight: bold;
+		cursor: pointer;
+		color: #333;
+	}
+
+	.stay-btn:hover {
+		background: #eee;
+	}
+
 	.actions {
 		margin-top: auto;
 		display: flex;
@@ -270,13 +398,37 @@
 		margin-bottom: 1rem;
 	}
 
-	.serving-alert {
+	.done-card {
+		background: white;
+		border-radius: 16px;
+		padding: 2rem;
+		text-align: center;
+		margin: auto 0;
+		border: 2px solid #1f9d55;
+	}
+
+	.done-card h2 {
+		color: #1f9d55;
+		margin-bottom: 1rem;
+	}
+
+	.done-card p {
+		color: #1f9d55;
+	}
+
+	.done-card button {
+		margin-top: 1rem;
 		background: #1f9d55;
 		color: white;
-		border-radius: 8px;
-		padding: 0.8rem 1rem;
-		text-align: center;
-		font-weight: bold;
+		border: none;
+		border-radius: 16px;
+		padding: 0.45rem 1.5rem;
 		font-size: 1rem;
+		font-weight: bold;
+		cursor: pointer;
+	}
+
+	.done-card button:hover {
+		background: #178a47;
 	}
 </style>

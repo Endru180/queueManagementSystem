@@ -12,19 +12,24 @@ app.use(express.json());
 app.post('/send-whatsapp', async (req, res) => {
 	const { target, message } = req.body;
 
-	const response = await fetch('https://api.fonnte.com/send', {
-		method: 'POST',
-		headers: {
-			Authorization: process.env.FONNTE_TOKEN
-		},
-		body: new URLSearchParams({
-			target,
-			message
-		})
-	});
+	try {
+		const response = await fetch('https://api.fonnte.com/send', {
+			method: 'POST',
+			headers: {
+				Authorization: process.env.FONNTE_TOKEN
+			},
+			body: new URLSearchParams({
+				target,
+				message
+			})
+		});
 
-	const result = await response.json();
-	res.json(result);
+		const result = await response.json();
+		res.json(result);
+	} catch (e) {
+		console.error('Fonnte request failed:', e);
+		res.status(500).json({ error: 'WhatsApp service unavailable' });
+	}
 });
 
 app.listen(3000, () => {

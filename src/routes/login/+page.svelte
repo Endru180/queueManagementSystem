@@ -117,11 +117,10 @@
 		border-radius: 16px;
 		padding: 1.5rem;
 		font-family: Arial, Helvetica, sans-serif !important;
-		font-size: 2px;
 	}
 
 	.login-card h3,
-	h4 {
+	.login-card h4 {
 		color: black;
 		font-family: Arial, Helvetica, sans-serif !important;
 	}

@@ -225,7 +225,7 @@
 			.select('*')
 			.in('status', ['served', 'skipped'])
 			.in('service_type_id', ids)
-			.order('finish_serving_at', { ascending: true })
+			.order('finish_serving_at', { ascending: false })
 			.limit(10);
 
 		servedQueues = servedData || [];
@@ -360,10 +360,12 @@
 	}
 
 	async function updateAvgDuration() {
+		const ids = await getServiceTypeIds();
 		const { data: recentQueues } = await supabase
 			.from('queues')
 			.select('start_serving_at, finish_serving_at, service_type_id')
 			.eq('status', 'served')
+			.in('service_type_id', ids)
 			.not('start_serving_at', 'is', null)
 			.not('finish_serving_at', 'is', null)
 			.order('finish_serving_at', { ascending: false })
