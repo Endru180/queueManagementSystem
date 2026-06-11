@@ -1,3 +1,4 @@
+<!-- The page that shows the existing service locations for each service category, such as Puskesmas, Samsat, and so on -->
 <script>
 	import { supabase } from '$lib/supabase.js';
 	import { onMount } from 'svelte';
@@ -9,6 +10,7 @@
 	let userLng = null;
 	let loading = false;
 
+	// Haversine distance formula
 	function getDistance(lat1, lng1, lat2, lng2) {
 		const R = 6371;
 		const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -27,6 +29,7 @@
 		window.location.href = '/login';
 	}
 
+	// Getting the service locations card
 	async function fetchLocations() {
 		if (!category) return;
 		loading = true;
@@ -106,13 +109,13 @@
 	{:else if locations.length === 0 && category}
 		<p>No locations found.</p>
 	{:else}
-		{#each locations as loc (loc.id)}
+		{#each locations as loc (loc.id)} <!-- Each service location card works like a button, the user clicks it, then they will go to that one specific service location accordingly -->
 			<button class="card" onclick={() => (window.location.href = `/services/${loc.id}`)}>
 				<div class="card-left">
 					<strong>{loc.name}</strong>
 					<span class="address">{loc.address}</span>
 				</div>
-				{#if loc.distance !== undefined}
+				{#if loc.distance !== undefined} <!-- Hide the distance badge if location's distance has not been calculated yet -->
 					<span class="distance">{loc.distance.toFixed(1)} km</span>
 				{/if}
 			</button>
@@ -143,7 +146,6 @@
 		cursor: pointer;
 		width: 100%;
 		text-align: left;
-		border: none;
 		color: black;
 		font-size: 1rem;
 		display: flex;

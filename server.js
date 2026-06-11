@@ -1,3 +1,4 @@
+// Express forwards the messages to the Fonnte WhatsApp API
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -12,7 +13,7 @@ app.use(express.json());
 app.post('/send-whatsapp', async (req, res) => {
 	const { target, message } = req.body;
 
-	try {
+	try { // Trying to forward the messages first
 		const response = await fetch('https://api.fonnte.com/send', {
 			method: 'POST',
 			headers: {
@@ -26,12 +27,12 @@ app.post('/send-whatsapp', async (req, res) => {
 
 		const result = await response.json();
 		res.json(result);
-	} catch (e) {
+	} catch (e) { // If it fails, the system will continue without any WA notification
 		console.error('Fonnte request failed:', e);
 		res.status(500).json({ error: 'WhatsApp service unavailable' });
 	}
 });
 
 app.listen(3000, () => {
-	console.log('WA server running on http://localhost:3000');
+	console.log('WA server running on http://localhost:3000'); // Log a confirmation once the server starts listening
 });

@@ -11,7 +11,7 @@
 	let loading = true;
 	let showCloseConfirm = false;
 
-	//walk in clients
+	// For Walk-in clients or On-site clients
 	let showWalkInForm = false;
 	let walkInNik = '';
 	let walkInWa = '';
@@ -37,41 +37,44 @@
 
 	function calculateWMA(queues) {
 		const durations = queues
-			.filter((q) => q.start_serving_at && q.finish_serving_at)
+			.filter((q) => q.start_serving_at && q.finish_serving_at) // Filter the data that has both start_serving_at and finish_serving_at
 			.map((q) => {
 				const start = new Date(q.start_serving_at);
 				const finish = new Date(q.finish_serving_at);
-				return (finish - start) / 60000;
-			})
-			.filter((d) => d > 0);
+				return (finish - start) / 60000; // Getting the duration in MINUTE
+			}) // Divided by 60000 because the unit is in ms (milliseconds)
+			.filter((d) => d > 0); // Make sure the duration is not 0 or less (negative)
 
-		if (durations.length === 0) return 7;
+		if (durations.length === 0) return 7; // If there is no any valid duration, return 7 minutes
 
-		// Hitung rata-rata sementara dulu
+		// First, calculate the average that will be a threshold for outlier filtering
 		const tempAvg = durations.reduce((a, b) => a + b, 0) / durations.length;
 
-		// Filter outlier — hapus durasi yang melebihi 2x rata-rata
+		// Second, remove those that exceed 2x the average (outliers)
 		const filtered = durations.filter((d) => d <= 2 * tempAvg);
 
-		if (filtered.length === 0) return 7;
+		if (filtered.length === 0) return 7; // If the data becomes empty after the filtering, return 7 minutes as the WMA calculation result
 
 		const latest = filtered.slice(0, 5);
 
-		let weightedTotal = 0;
-		let weightTotal = 0;
+		// WMA = (Σ(duration × weight))/(Σ(weight))
+		let weightedTotal = 0; // Σ(duration × weight)
+		let weightTotal = 0; // Σ(weight)
 
 		latest.forEach((duration, index) => {
-			const weight = latest.length - index;
-			weightedTotal += duration * weight;
-			weightTotal += weight;
+			const weight = latest.length - index; // Example: latest = [5, 6, 7, 8, 9], weight for 5 is 5 - 0 (index of 5) = 5
+			weightedTotal += duration * weight; // Σ(duration × weight)
+			weightTotal += weight; // Σ(weight)
 		});
 
-		return Math.round(weightedTotal / weightTotal);
+		return Math.round(weightedTotal / weightTotal); // Return the WMA calculation result
 	}
 
+	// Notify the top 3 waiting users via WA
 	async function notifyUpcomingQueues() {
 		const ids = await getServiceTypeIds();
 
+		// Take the top 3 waiting users from Supabase
 		const { data: upcomingQueues } = await supabase
 			.from('queues')
 			.select('*')
@@ -82,7 +85,9 @@
 
 		if (!upcomingQueues || upcomingQueues.length === 0) return;
 
+		// For each user that is in top 3, notify them via WA
 		for (let i = 0; i < upcomingQueues.length; i++) {
+			// upcomingQueues.length is AT MOST 3 (due to .limit(3) above)
 			const queue = upcomingQueues[i];
 			const estimatedWait = averageMinutes * (i + 1);
 
@@ -109,6 +114,7 @@
 		serviceTypes = data || [];
 	}
 
+	// Has a similar structure with takeQueue() that is for ONLINE client
 	async function addWalkInQueue() {
 		walkInError = '';
 
@@ -230,7 +236,7 @@
 
 		servedQueues = servedData || [];
 
-		// Query terpisah untuk WMA (descending — terbaru duluan)
+		// Separate query just for the WMA calculation
 		const { data: wmaData } = await supabase
 			.from('queues')
 			.select('*')
@@ -244,6 +250,7 @@
 		loading = false;
 	}
 
+	// Ensure real-time updates from Supabase are reflected on the desk
 	function subscribeRealtime() {
 		supabase
 			.channel('officer-queue-channel')
@@ -279,6 +286,7 @@
 		const newSkipCount = (nextQueue.skip_count || 0) + 1;
 
 		if (newSkipCount >= 3) {
+			// If the skipped_count is already 3 or more than 3, forfeit the user's queue
 			try {
 				await fetch('http://localhost:3000/send-whatsapp', {
 					method: 'POST',
@@ -297,6 +305,7 @@
 				.update({ status: 'forfeited', skip_count: newSkipCount, finish_serving_at: now })
 				.eq('id', nextQueue.id);
 		} else {
+			// If the skipped_count is still less than 3
 			const { data: maxQueue } = await supabase
 				.from('queues')
 				.select('queue_number')
@@ -305,7 +314,7 @@
 				.limit(1)
 				.single();
 
-			const newQueueNumber = (maxQueue?.queue_number || nextQueue.queue_number) + 3;
+			const newQueueNumber = (maxQueue?.queue_number || nextQueue.queue_number) + 3; // Move the user to the number of (maximum queue + 3)
 
 			await supabase
 				.from('queues')
@@ -348,7 +357,8 @@
 			.eq('id', currentQueue.id);
 
 		if (!error) {
-			// Reset delay_minutes ke 0
+			// Whether or not a hard case occurred, reset delay_minutes to 0 so the delay
+			// doesn't carry over to the next client
 			const ids = await getServiceTypeIds();
 			await supabase.from('service_types').update({ delay_minutes: 0 }).in('id', ids);
 
@@ -359,6 +369,8 @@
 		}
 	}
 
+	// Once a specific user is served, re-calculate all other users' WMA/estimated time
+	// CRUCIAL TO NOTE: this WMA calculation will re-calculate based on 5 latest served clients, not all clients
 	async function updateAvgDuration() {
 		const ids = await getServiceTypeIds();
 		const { data: recentQueues } = await supabase
@@ -373,19 +385,18 @@
 
 		if (!recentQueues || recentQueues.length === 0) return;
 
-		// Hitung rata-rata sementara dulu
+		// Similar with previous WMA calculation code
 		const durations = recentQueues.map(
 			(q) => (new Date(q.finish_serving_at) - new Date(q.start_serving_at)) / 60000
 		);
 
 		const tempAvg = durations.reduce((a, b) => a + b, 0) / durations.length;
 
-		// Filter outlier — hapus durasi yang melebihi 2x rata-rata
 		const filtered = durations.filter((d) => d <= 2 * tempAvg);
 
 		if (filtered.length === 0) return;
 
-		// Hitung WMA dari data yang sudah difilter
+		// Since we are just using 5 latest served clients, the weights are already assigned from 5 to 1 where 5 is the youngest (most recent) and 1 is the oldest
 		const weights = [5, 4, 3, 2, 1];
 		let totalWeight = 0;
 		let weightedSum = 0;
@@ -425,6 +436,7 @@
 		registrationOpen = true;
 	}
 
+	// Add 15 minutes buffer for other users' WMA calculation. THIS IS JUST AN AD HOC SOLUTION
 	async function hardCase() {
 		const confirmed = confirm('Add 15 minutes buffer for all waiting queues?');
 		if (!confirmed) return;
@@ -671,6 +683,7 @@
 		grid-template-columns: 2fr 1fr;
 		gap: 1rem;
 		margin-top: 1rem;
+		align-items: start;
 	}
 
 	.served-list,

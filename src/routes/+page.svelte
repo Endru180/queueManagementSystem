@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { browser, dev } from '$app/environment';
 
+	// Only for development process to facilitate the retest process from the beginning
 	if (browser && dev) {
 		const lastReload = sessionStorage.getItem('devReloaded');
 
@@ -17,15 +18,17 @@
 	let subdistricts = [];
 
 	function logout() {
-		localStorage.removeItem('userSession');
-		window.location.href = '/login';
+		localStorage.removeItem('userSession'); // Remove the session
+		window.location.href = '/login'; // and get the user back to the login page
 	}
 
+	// Loading the provinces data from the previous seeding process into Supabase before
 	async function loadProvinces() {
 		const { data } = await supabase.from('provinces').select('*').order('name');
 		provinces = data || [];
 	}
 
+	// Loading the cities data
 	async function loadCities(provinceId) {
 		const { data } = await supabase
 			.from('cities')
@@ -36,6 +39,7 @@
 		subdistricts = [];
 	}
 
+	// Then, load the subdistricts data
 	async function loadSubdistricts(cityId) {
 		const { data } = await supabase
 			.from('subdistricts')
@@ -45,7 +49,7 @@
 		subdistricts = data || [];
 	}
 
-	let activeQueues = [];
+	let activeQueues = []; // For the Active Queues card on User's home page
 
 	onMount(async () => {
 		const raw = localStorage.getItem('userSession');
@@ -78,31 +82,44 @@
 		districtName: ''
 	};
 
+	// The function that shows toast when all the needed location info already inputted
 	function checkAndShowToast() {
 		if (manualLocation.province && manualLocation.city && manualLocation.district) {
 			showToast = true;
 		}
 	}
 
+	// Once the button "Confirm" is already pressed, the toast disappears
 	function confirmLocation() {
 		locationConfirmed = true;
 		showToast = false;
 	}
 
+	// Get the selected province
 	function onProvinceSelect(e) {
 		locationConfirmed = false;
+		showToast = false;
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.province = opt.value;
 		manualLocation.provinceName = opt.text;
-		loadCities(opt.value);
-		checkAndShowToast();
+		// Reset downstream selections so a stale toast doesn't show a mismatched location
+		manualLocation.city = '';
+		manualLocation.cityName = '';
+		manualLocation.district = '';
+		manualLocation.districtName = '';
+		loadCities(opt.value); // From this selected province, load the cities that are in that province
+		checkAndShowToast(); // Always check if all the location info already inputted
 	}
 
+	// The same logic also works for the selected city and the selected subdistrict
 	function onCitySelect(e) {
 		locationConfirmed = false;
+		showToast = false;
 		const opt = e.currentTarget.selectedOptions[0];
 		manualLocation.city = opt.value;
 		manualLocation.cityName = opt.text;
+		manualLocation.district = '';
+		manualLocation.districtName = '';
 		loadSubdistricts(opt.value);
 		checkAndShowToast();
 	}
@@ -116,10 +133,11 @@
 		if (selected) {
 			localStorage.setItem('userLat', selected.latitude);
 			localStorage.setItem('userLng', selected.longitude);
-		}
+		} // Instead of load the villages from the selected subdistrict, just get that subdistrict's latitude and longitude, assuming it is the user's location
 		checkAndShowToast();
 	}
 
+	// Haversine distance formula
 	function getDistance(lat1, lng1, lat2, lng2) {
 		const R = 6371;
 		const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -134,7 +152,7 @@
 	}
 </script>
 
-<!-- Toast -->
+<!-- The location confirmation toast -->
 {#if showToast}
 	<div class="toast">
 		<p>
@@ -151,6 +169,7 @@
 	</div>
 
 	<div class="manual-location">
+		<!-- Drop down option for provinces, cities, and subdistricts for manual location selection -->
 		<select onchange={onProvinceSelect}>
 			<option value="" disabled selected>Select Province</option>
 			{#each provinces as p (p.id)}
@@ -173,7 +192,7 @@
 		</select>
 	</div>
 	<select
-		disabled={!locationReady}
+		disabled={!locationReady} // If the user has not filled the province, city, and the subdistrict, disable the services drop down for a while
 		onchange={(e) => {
 			const val = e.currentTarget.value;
 			if (val) window.location.href = `/services?category=${val}`;
@@ -189,13 +208,13 @@
 	{#if activeQueues.length > 0}
 		<h3>Your Active Queue</h3>
 		{#each activeQueues as q (q.id)}
-			<button
+			<button // The active queue card works like a button, the user presses it, then they will go to the Monitor page (/monitor)
 				class="queue-card"
 				onclick={() => (window.location.href = `/monitor?queueId=${q.id}`)}
 			>
 				<div class="queue-card-left">
 					<strong>{q.service_types?.service_locations?.name}</strong>
-					<p>{q.service_types?.name} — No. {q.queue_number}</p>
+					<p>{q.service_types?.name} - No. {q.queue_number}</p>
 				</div>
 				{#if q.service_types?.service_locations}
 					{@const loc = q.service_types.service_locations}
@@ -238,7 +257,6 @@
 		cursor: pointer;
 		width: 100%;
 		text-align: left;
-		border: none;
 		color: black !important;
 		font-size: 1rem;
 		display: flex;

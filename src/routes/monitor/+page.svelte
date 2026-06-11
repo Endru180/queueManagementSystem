@@ -1,3 +1,4 @@
+<!-- This is the monitor page for the USER -->
 <script>
 	import { supabase } from '$lib/supabase.js';
 	import { onMount, onDestroy } from 'svelte';
@@ -7,12 +8,14 @@
 	let currentNumber = null;
 	let loading = true;
 	let subscription = null;
+	let pollingInterval = null;
 
 	let countdown = null;
 	let countdownInterval = null;
 	let countdownCancelled = false;
 	let countdownReason = null;
 
+	// Fetching all the data to be shown on monitor page
 	async function fetchQueueData(queueId) {
 		const { data: myData } = await supabase
 			.from('queues')
@@ -28,16 +31,16 @@
 				.select('queue_number, service_types!inner(service_location_id)')
 				.eq('service_types.service_location_id', myQueue.service_types.service_location_id)
 				.eq('status', 'serving')
-				.order('queue_number', { ascending: false })
-				.limit(1)
-				.single();
+				.order('queue_number', { ascending: false }) // Get the highest queue_number among rows that are currently 'serving'
+				.limit(1); 
 
-			currentNumber = serving ? serving.queue_number : null;
+			currentNumber = serving?.[0] ? serving[0].queue_number : null;
 		}
 
 		loading = false;
 	}
 
+	// Countdown function to let the user stays on the monitor page for 30 seconds, before being taken back to the home page
 	function startCountdown() {
 		if (countdownInterval) return;
 		countdown = 30;
@@ -51,6 +54,7 @@
 		}, 1000);
 	}
 
+	// The user may still stay on the monitor page if they want to
 	function cancelCountdown() {
 		countdownCancelled = true;
 		clearInterval(countdownInterval);
@@ -60,16 +64,16 @@
 
 	function subscribeRealtime(queueId) {
 		subscription = supabase
-			.channel('queue-monitor')
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'queues' },
-				() => { fetchQueueData(queueId); }
-			)
+			.channel(`queue-monitor-${queueId}`)
+			.on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, () => {
+				fetchQueueData(queueId);
+			})
 			.on(
 				'postgres_changes',
 				{ event: 'UPDATE', schema: 'public', table: 'service_types' },
-				() => { fetchQueueData(queueId); }
+				() => {
+					fetchQueueData(queueId);
+				}
 			)
 			.subscribe();
 	}
@@ -82,6 +86,7 @@
 		window.location.href = '/';
 	}
 
+	// The condition that must be fulfilled so that user is skipped
 	$: isPassed =
 		myQueue &&
 		currentNumber !== null &&
@@ -89,6 +94,7 @@
 		myQueue.status !== 'serving' &&
 		myQueue.status !== 'served';
 
+	// The condition if the queue is getting closer
 	$: isNearby =
 		myQueue &&
 		currentNumber !== null &&
@@ -96,6 +102,7 @@
 		myQueue.queue_number >= currentNumber &&
 		myQueue.status !== 'serving';
 
+	// The condition to show the estimated time
 	$: estimasi =
 		myQueue && !isPassed
 			? Math.max(0, myQueue.queue_number - (currentNumber ?? 0)) *
@@ -128,12 +135,18 @@
 		if (queueId) {
 			fetchQueueData(queueId);
 			subscribeRealtime(queueId);
+
+			// On every 3 seconds, the browser re-fetches the queue data from Supabase as the mitigation for realtime connection failure
+			pollingInterval = setInterval(() => {
+				fetchQueueData(queueId);
+			}, 3000);
 		}
 	});
 
 	onDestroy(() => {
 		if (subscription) subscription.unsubscribe();
 		if (countdownInterval) clearInterval(countdownInterval);
+		if (pollingInterval) clearInterval(pollingInterval);
 	});
 </script>
 
@@ -177,7 +190,10 @@
 
 			{#if isPassed}
 				<div class="passed-alert">
-					<span>⚠️ Your number has already passed. You may have been skipped or already served.</span>
+					<span
+						>⚠️ Your number has already passed. You may have been skipped or already served, but you
+						forgot.</span
+					>
 					{#if countdown !== null}
 						<div class="countdown-row">
 							<span class="countdown-text">Redirecting to home in {countdown}s...</span>
@@ -199,20 +215,18 @@
 			</div>
 
 			{#if myQueue.status === 'serving'}
-				<!-- estimation hidden: it's your turn -->
+				<!-- The estimation is hidden because it is already your turn, you do not need to check the estimation time anymore -->
 			{:else if currentNumber === null}
-				<div class="estimation">
-					The service has not started yet.
-				</div>
+				<div class="estimation">The service has not started yet.</div>
 			{:else if estimasi !== null}
 				<div class="estimation">
 					Estimation: <strong>{estimasi} minutes again.</strong>
 				</div>
 			{/if}
 
-			{#if myQueue?.service_types?.delay_minutes > 0}
+			{#if myQueue.status !== 'serving' && myQueue?.service_types?.delay_minutes > 0}
 				<div class="delay-alert">
-					Sorry, the officer is handling a case that requires more time.
+					Sorry, the officer is handling a case that requires more time. <!-- When Hard Case happens -->
 				</div>
 			{/if}
 
@@ -389,13 +403,33 @@
 		border-radius: 16px;
 		padding: 2rem;
 		text-align: center;
-		margin-top: 2rem;
+		margin: auto 0;
 		border: 2px solid #e53935;
 	}
 
 	.forfeited-card h2 {
 		color: #e53935;
 		margin-bottom: 1rem;
+	}
+
+	.forfeited-card p {
+		color: #e53935;
+	}
+
+	.forfeited-card button {
+		margin-top: 1rem;
+		background: #e53935;
+		color: white;
+		border: none;
+		border-radius: 16px;
+		padding: 0.45rem 1.5rem;
+		font-size: 1rem;
+		font-weight: bold;
+		cursor: pointer;
+	}
+
+	.forfeited-card button:hover {
+		background: #e53935;
 	}
 
 	.done-card {

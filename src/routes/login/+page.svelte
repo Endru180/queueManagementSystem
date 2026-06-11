@@ -1,8 +1,9 @@
+<!-- Login page for both user and officer -->
 <script>
 	import { supabase } from '$lib/supabase.js';
 
 	let role = '';
-	let identifier = ''; // NIK untuk client, email untuk officer
+	let identifier = ''; // NIK for the clients and email for the officer
 	let password = '';
 	let error = '';
 
@@ -14,20 +15,21 @@
 			return;
 		}
 
-		if (role === 'client') {
-			// Validasi NIK
+		if (role === 'client') { // If the user is a client, input the NIK
+			// NIK Validation 
 			if (identifier.length !== 16 || !/^\d+$/.test(identifier)) {
 				error = 'NIK must be 16 digits.';
 				return;
 			}
 
-			// Hash NIK
+			// NIK hashing
 			const encoder = new TextEncoder();
 			const data = encoder.encode(identifier);
 			const hashBuffer = await crypto.subtle.digest('SHA-256', data);
 			const hashArray = Array.from(new Uint8Array(hashBuffer));
 			const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
+			// Fetch the client data from Supabase and compare them with the inputted data
 			const { data: userData, error: loginError } = await supabase
 				.from('clients')
 				.select('*')
@@ -40,6 +42,7 @@
 				return;
 			}
 
+			// This prototype still relies on localStorage about the login info
 			localStorage.setItem(
 				'userSession',
 				JSON.stringify({

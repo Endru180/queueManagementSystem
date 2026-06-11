@@ -23,7 +23,7 @@
 
 		const { data } = await supabase
 			.from('service_locations')
-			.select('*, is_registration_open')
+			.select('*')
 			.eq('id', id)
 			.single();
 
@@ -39,6 +39,7 @@
 		loading = false;
 	}
 
+	// The main queue-taking function
 	async function takeQueue() {
 		error = '';
 
@@ -60,7 +61,7 @@
 			return;
 		}
 
-		const confirmed = confirm('Are you sure you want to take a queue?');
+		const confirmed = confirm('Are you sure you want to take a queue?'); // Send the pop-up confirmation first
 		if (!confirmed) return;
 
 		submitting = true;
@@ -70,9 +71,9 @@
 
 		const encoder = new TextEncoder();
 		const data = encoder.encode(nik);
-		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data); 
 		const hashArray = Array.from(new Uint8Array(hashBuffer));
-		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+		const nikHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join(''); // Hash the inputted NIK at the "take-queue" page
 
 		if (nikHash !== session.nikHash) {
 			error = 'NIK must match with your registered NIK.';
@@ -80,7 +81,7 @@
 			return;
 		}
 
-		// Cek apakah NIK sudah ada di antrian hari ini
+		// Ensuring each person = one NIK = one queue at a time
 		const { data: existing } = await supabase
 			.from('queues')
 			.select('id')
@@ -88,20 +89,20 @@
 			.eq('status', 'waiting')
 			.single();
 
-		if (existing) {
+		if (existing) { // If the hashed NIK is already used once from previous queue-taking process, the user can not submit twice with the same NIK
 			error = 'You already have an active queue!';
 			submitting = false;
 			return;
 		}
 
 		const { data: queueData } = await supabase.rpc('get_next_queue_number', {
-			loc_id: location.id
+			loc_id: location.id 
 		});
 
 		const queueNumber = queueData;
 		const { data: newQueue, error: insertError } = await supabase
 			.from('queues')
-			.insert({
+			.insert({ // Insert all the previous inputted data
 				service_type_id: selectedServiceType,
 				client_id: session.id,
 				nik_hash: nikHash,
@@ -111,13 +112,13 @@
 			.select()
 			.single();
 
-		if (insertError) {
+		if (insertError) { // If the insertion or "queue-taking" process is unsuccessful, do not submit anything
 			error = 'Failed to take queue. Please try again.';
 			submitting = false;
 			return;
 		}
 
-		try {
+		try { // If the queue is successfully taken, try to send the WA notification
 			await fetch('http://localhost:3000/send-whatsapp', {
 				method: 'POST',
 				headers: {
@@ -129,7 +130,7 @@
 				})
 			});
 		} catch (e) {
-			console.warn('WhatsApp server not available:', e);
+			console.warn('WhatsApp server not available:', e); // If the server is not yet turned on or something else, log the warning
 		}
 		window.location.href = `/monitor?queueId=${newQueue.id}`;
 	}
@@ -187,7 +188,7 @@
 			onclick={takeQueue}
 			disabled={submitting || !location.is_registration_open}
 		>
-			{submitting ? 'Processing...' : 'Take Queue'}
+			{submitting ? 'Processing...' : 'Take Queue'} <!-- Once the button is clicked, the word changes from "Take Queue" to "Processing..." -->
 		</button>
 	</main>
 {/if}
